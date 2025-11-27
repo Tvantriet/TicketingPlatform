@@ -1,0 +1,49 @@
+// Prisma Schema - Models Layer
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(255)
+  description String?   @db.Text
+  venue       String    @db.VarChar(255)
+  date        DateTime  @db.Timestamp
+  capacity    Int
+  price       Decimal   @default(0) @db.Decimal(10, 2)
+  ticketsSold Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp
+  tickets     Ticket[]
+
+  @@index([date])
+  @@index([venue])
+  @@map("events")
+}
+
+model Ticket {
+  id            Int       @id @default(autoincrement())
+  eventId       Int       @map("event_id")
+  price         Decimal   @db.Decimal(10, 2)
+  status        TicketStatus @default(AVAILABLE)
+  transactionId String?   @map("transaction_id") @db.VarChar(255)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp
+  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([status])
+  @@index([transactionId])
+  @@map("tickets")
+}
+
+enum TicketStatus {
+  AVAILABLE
+  RESERVED
+  BOOKED
+}
+

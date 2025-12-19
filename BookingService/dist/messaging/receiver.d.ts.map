@@ -1,0 +1,1 @@
+{"version":3,"file":"receiver.d.ts","sourceRoot":"","sources":["../../src/messaging/receiver.ts"],"names":[],"mappings":"AA6GA,wBAAsB,aAAa,CAC/B,iBAAiB,EAAE,MAAM,EACzB,OAAO,EAAE,CAAC,GAAG,EAAE,GAAG,KAAK,IAAI,EAC3B,SAAS,GAAE,MAAW,EACtB,QAAQ,CAAC,EAAE,MAAM,GAClB,OAAO,CAAC,IAAI,CAAC,CAiBf;AAED,wBAAsB,cAAc,IAAI,OAAO,CAAC,IAAI,CAAC,CAepD"}

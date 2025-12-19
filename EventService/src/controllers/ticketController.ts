@@ -133,7 +133,8 @@ export const updateTicketStatus = async (req: Request, res: Response): Promise<v
 
 export const reserveTicket = async (req: Request, res: Response): Promise<void> => {
   try {
-    const ticket = await ticketService.reserveTicket(req.params.id);
+    const { bookingId } = req.body;
+    const ticket = await ticketService.reserveTicket(req.params.id, bookingId);
     res.json(ticket);
   } catch (error) {
     if (error instanceof Error) {
@@ -145,6 +146,22 @@ export const reserveTicket = async (req: Request, res: Response): Promise<void> 
     }
     console.error('Error reserving ticket:', error);
     res.status(500).json({ error: 'Failed to reserve ticket' });
+  }
+};
+
+export const releaseTicket = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const ticket = await ticketService.releaseTicket(req.params.id);
+    res.json(ticket);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Ticket not found') {
+        res.status(404).json({ error: error.message });
+        return;
+      }
+    }
+    console.error('Error releasing ticket:', error);
+    res.status(500).json({ error: 'Failed to release ticket' });
   }
 };
 

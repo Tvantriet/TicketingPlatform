@@ -1,0 +1,114 @@
+{
+  "dashboard": {
+    "title": "Pod Autoscaling - Simple",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "type": "graph",
+        "title": "HPA Current Replicas",
+        "targets": [
+          {
+            "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"booking-hpa\"}",
+            "legendFormat": "BookingService Replicas",
+            "refId": "A"
+          },
+          {
+            "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"eventservice-hpa\"}",
+            "legendFormat": "EventService Replicas",
+            "refId": "B"
+          }
+        ],
+        "datasource": "Prometheus",
+        "yaxes": [
+          {"format": "short", "min": 0, "max": 5},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "type": "stat",
+        "title": "BookingService Pods",
+        "targets": [
+          {
+            "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"booking-hpa\"}",
+            "refId": "A"
+          }
+        ],
+        "datasource": "Prometheus",
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 3},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "type": "stat",
+        "title": "EventService Pods",
+        "targets": [
+          {
+            "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"eventservice-hpa\"}",
+            "refId": "A"
+          }
+        ],
+        "datasource": "Prometheus",
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 3},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "type": "graph",
+        "title": "HPA Desired vs Current Replicas",
+        "targets": [
+          {
+            "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"booking-hpa\"}",
+            "legendFormat": "Booking Desired",
+            "refId": "A"
+          },
+          {
+            "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"booking-hpa\"}",
+            "legendFormat": "Booking Current",
+            "refId": "B"
+          }
+        ],
+        "datasource": "Prometheus",
+        "yaxes": [
+          {"format": "short", "min": 0},
+          {"format": "short"}
+        ]
+      }
+    ],
+    "refresh": "5s",
+    "time": {"from": "now-15m", "to": "now"},
+    "timezone": "browser",
+    "schemaVersion": 27
+  }
+}
+

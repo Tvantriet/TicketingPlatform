@@ -18,6 +18,39 @@ services:
     networks:
       - ticketing-network
 
+  event-service:
+    build:
+      context: ./EventService
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      - rabbitmq
+    networks:
+      - ticketing-network
+
+  booking-service:
+    build:
+      context: ./BookingService
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    depends_on:
+      - rabbitmq
+    networks:
+      - ticketing-network
+
+  mock-payment-service:
+    build:
+      context: ./MockPaymentService
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    depends_on:
+      - rabbitmq
+    networks:
+      - ticketing-network
+      
 volumes:
   rabbitmq_data:
 

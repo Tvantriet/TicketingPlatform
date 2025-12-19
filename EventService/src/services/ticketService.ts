@@ -126,7 +126,7 @@ export const updateTicketStatus = async (
   return updatedTicket;
 };
 
-export const reserveTicket = async (id: number | string): Promise<Ticket> => {
+export const reserveTicket = async (id: number | string, bookingId?: string): Promise<Ticket> => {
   const ticket = await prisma.ticket.findUnique({
     where: { id: parseInt(String(id)) },
   });
@@ -143,9 +143,49 @@ export const reserveTicket = async (id: number | string): Promise<Ticket> => {
     where: { id: parseInt(String(id)) },
     data: {
       status: TicketStatus.RESERVED,
+      reservedAt: new Date(),
+      transactionId: bookingId || null,
+    },
+  });
+};
+
+export const releaseTicket = async (id: number | string): Promise<Ticket> => {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: parseInt(String(id)) },
+  });
+
+  if (!ticket) {
+    throw new Error('Ticket not found');
+  }
+
+  return await prisma.ticket.update({
+    where: { id: parseInt(String(id)) },
+    data: {
+      status: TicketStatus.AVAILABLE,
+      reservedAt: null,
       transactionId: null,
     },
   });
+};
+
+export const releaseExpiredReservations = async (): Promise<number> => {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  
+  const result = await prisma.ticket.updateMany({
+    where: {
+      status: TicketStatus.RESERVED,
+      reservedAt: {
+        lt: tenMinutesAgo,
+      },
+    },
+    data: {
+      status: TicketStatus.AVAILABLE,
+      reservedAt: null,
+      transactionId: null,
+    },
+  });
+  
+  return result.count;
 };
 
 export const bookTicket = async (
@@ -185,7 +225,7 @@ export const bookTicket = async (
   });
 
   // Update event's tickets_sold count if transitioning to booked
-  if (ticket.status !== TicketStatus.BOOKED) {
+  if (ticket.status === TicketStatus.AVAILABLE || ticket.status === TicketStatus.RESERVED) {
     await prisma.event.update({
       where: { id: ticket.eventId },
       data: {

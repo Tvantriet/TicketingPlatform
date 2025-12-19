@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mockpaymentservice-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mockpaymentservice
+  template:
+    metadata:
+      labels:
+        app: mockpaymentservice
+    spec:
+      containers:
+        - name: mockpaymentservice
+          image: mockpaymentservice:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3002
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          env:
+            - name: RABBITMQ_URL
+              value: "amqp://admin:admin@rabbitmq:5672"
+            - name: PORT
+              value: "3002"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mockpaymentservice-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mockpaymentservice-deployment
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50

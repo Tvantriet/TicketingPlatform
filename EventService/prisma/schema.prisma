@@ -30,6 +30,7 @@ model Ticket {
   eventId       Int       @map("event_id")
   price         Decimal   @db.Decimal(10, 2)
   status        TicketStatus @default(AVAILABLE)
+  reservedAt    DateTime? @map("reserved_at") @db.Timestamp
   transactionId String?   @map("transaction_id") @db.VarChar(255)
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp
@@ -38,6 +39,7 @@ model Ticket {
   @@index([eventId])
   @@index([status])
   @@index([transactionId])
+  @@index([reservedAt])
   @@map("tickets")
 }
 

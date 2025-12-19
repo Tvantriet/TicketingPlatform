@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Booking {
+  id              Int           @id @default(autoincrement())
+  bookingId       String        @unique @map("booking_id") @db.VarChar(100)
+  ticketId        Int           @map("ticket_id")
+  userId          String        @map("user_id") @db.VarChar(100)
+  status          BookingStatus @default(PENDING)
+  amount          Decimal       @db.Decimal(10, 2)
+  paymentDetails  Json?         @map("payment_details")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp
+  expiresAt       DateTime      @map("expires_at") @db.Timestamp
+  completedAt     DateTime?     @map("completed_at") @db.Timestamp
+
+  @@index([bookingId])
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  EXPIRED
+}
+

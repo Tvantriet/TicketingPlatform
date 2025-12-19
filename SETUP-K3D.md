@@ -1,0 +1,118 @@
+# K3D Setup Guide for Ticketing Platform
+
+## Prerequisites
+- Docker Desktop running
+- k3d installed
+
+## Step-by-Step Setup
+
+### 1. Create k3d cluster
+```powershell
+k3d cluster create ticketing
+```
+
+### 2. Build Docker images
+```powershell
+# Build BookingService
+cd BookingService
+docker build -t bookingservice:latest .
+cd ..
+
+# Build EventService
+cd EventService
+docker build -t eventservice:latest .
+cd ..
+
+# Build MockPaymentService
+cd MockPaymentService
+docker build -t mockpaymentservice:latest .
+cd ..
+```
+
+### 3. Import images into k3d
+```powershell
+k3d image import bookingservice:latest eventservice:latest mockpaymentservice:latest -c ticketing
+```
+
+### 4. Deploy infrastructure (RabbitMQ only)
+```powershell
+kubectl apply -f k8s-infrastructure.yaml
+```
+
+Wait for RabbitMQ to be ready:
+```powershell
+kubectl get pods -w
+```
+(Press Ctrl+C when RabbitMQ shows "Running")
+
+### 5. Update DATABASE_URL in deployments
+Edit your deployment files to point to your cloud postgres:
+- `BookingService/deployment.yaml` - set DATABASE_URL env var
+- `EventService/deployment.yaml` - set DATABASE_URL env var
+
+Example:
+```yaml
+env:
+  - name: DATABASE_URL
+    value: "postgresql://user:pass@your-cloud-host:5432/dbname"
+```
+
+### 6. Deploy services
+```powershell
+kubectl apply -f k8s-services.yaml
+kubectl apply -f BookingService/deployment.yaml
+kubectl apply -f EventService/deployment.yaml
+kubectl apply -f MockPaymentService/deployment.yaml
+```
+
+### 7. Verify everything is running
+```powershell
+kubectl get pods
+kubectl get svc
+kubectl get hpa
+```
+
+### 8. Test autoscaling
+```powershell
+# Watch HPA status
+kubectl get hpa -w
+
+# Generate load (in another terminal)
+kubectl run -it --rm load-generator --image=busybox --restart=Never -- /bin/sh -c "while true; do wget -q -O- http://bookingservice:3003/health; done"
+```
+
+## Useful Commands
+
+```powershell
+# View logs
+kubectl logs -f deployment/booking-deployment
+kubectl logs -f deployment/eventservice-deployment
+kubectl logs -f deployment/mockpaymentservice-deployment
+
+# Delete cluster
+k3d cluster delete ticketing
+
+# Rebuild and redeploy a service
+cd BookingService
+docker build -t bookingservice:latest .
+k3d image import bookingservice:latest -c ticketing
+kubectl rollout restart deployment/booking-deployment
+```
+
+## Port Forwarding (for local access)
+
+```powershell
+# Access RabbitMQ management UI
+kubectl port-forward svc/rabbitmq 15672:15672
+# Then open: http://localhost:15672 (admin/admin)
+
+# Access BookingService
+kubectl port-forward svc/bookingservice 3003:3003
+
+# Access EventService
+kubectl port-forward svc/eventservice 3001:3001
+
+# Access MockPaymentService
+kubectl port-forward svc/mockpaymentservice 3002:3002
+```
+

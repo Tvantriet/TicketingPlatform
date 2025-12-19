@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 
-export const testFunction = async (req: Request, res: Response): Promise<void> => {
+// No exposed rest endpoints besides a test and /heath check
+export const testFunction = async (_req: Request, res: Response): Promise<void> => {
     try {
         res.json({ message: 'Payment processed successfully' });
     } catch (error) {

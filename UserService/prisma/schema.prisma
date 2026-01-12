@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int         @id @default(autoincrement())
+  userName  String      @unique @map("user_name") @db.VarChar(20)
+  email     String?     @unique @db.VarChar(255)
+  hash      String      @db.VarChar(255)
+  salt      String      @db.VarChar(255)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamp
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamp
+  auditLogs AuditLog[]
+
+  @@index([userName])
+  @@index([email])
+  @@map("users")
+}
+
+model AuditLog {
+  id                Int           @id @default(autoincrement())
+  userId            Int?          @map("user_id")
+  eventType         AuditEventType @map("event_type")
+  attemptedUsername String?       @map("attempted_username") @db.VarChar(20)
+  attemptedEmail    String?       @map("attempted_email") @db.VarChar(255)
+  ipAddress         String?       @map("ip_address") @db.VarChar(45)
+  userAgent         String?       @map("user_agent") @db.VarChar(500)
+  reason            String?       @db.VarChar(255)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamp
+  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([attemptedUsername])
+  @@index([attemptedEmail])
+  @@index([ipAddress])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum AuditEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_CHANGE
+  ACCOUNT_LOCKED
+  ACCOUNT_UNLOCKED
+}

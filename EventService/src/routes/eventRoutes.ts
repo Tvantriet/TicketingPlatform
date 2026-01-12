@@ -4,16 +4,16 @@ import {
   getEvent, 
   getAllEvents, 
   updateEvent,
-  deleteEvent 
+  deleteEvent,
 } from '../controllers/eventController.js';
+import { upload } from '../middleware/upload.js';
 
 const router = express.Router();
 
-router.post('/', createEvent);
+router.post('/', upload.single('image'), createEvent);
 router.get('/', getAllEvents);
 router.get('/:id', getEvent);
-router.put('/:id', updateEvent);
+router.put('/:id', upload.single('image'), updateEvent);
 router.delete('/:id', deleteEvent);
 
 export default router;
-

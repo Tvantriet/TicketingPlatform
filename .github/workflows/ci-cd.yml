@@ -1,0 +1,127 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      event-service: ${{ steps.changes.outputs.event-service }}
+      booking-service: ${{ steps.changes.outputs.booking-service }}
+      mock-payment-service: ${{ steps.changes.outputs.mock-payment-service }}
+      gateway: ${{ steps.changes.outputs.gateway }}
+      user-service: ${{ steps.changes.outputs.user-service }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            event-service:
+              - 'EventService/**'
+            booking-service:
+              - 'BookingService/**'
+            mock-payment-service:
+              - 'MockPaymentService/**'
+            gateway:
+              - 'Gateway/**'
+            user-service:
+              - 'UserService/**'
+            frontend:
+              - 'Frontend/**'
+
+  build-event:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.event-service == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: EventService
+      service-path: EventService
+      has-prisma: true
+      has-dockerfile: true
+      image-name: event
+    secrets: inherit
+
+  build-booking:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.booking-service == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: BookingService
+      service-path: BookingService
+      has-prisma: true
+      has-dockerfile: true
+      image-name: booking
+    secrets: inherit
+
+  build-payment:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.mock-payment-service == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: MockPaymentService
+      service-path: MockPaymentService
+      has-prisma: false
+      has-dockerfile: true
+      image-name: payment
+    secrets: inherit
+
+  build-gateway:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.gateway == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: Gateway
+      service-path: Gateway
+      has-prisma: false
+      has-dockerfile: false
+      image-name: gateway
+    secrets: inherit
+
+  build-user:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.user-service == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: UserService
+      service-path: UserService
+      has-prisma: false
+      has-dockerfile: false
+      image-name: user
+    secrets: inherit
+
+  build-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: Frontend
+      service-path: Frontend
+      has-prisma: false
+      has-dockerfile: true
+      image-name: frontend
+    secrets: inherit
+
+  deploy:
+    needs: [detect-changes, build-event, build-booking, build-payment, build-frontend]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (needs.build-event.result == 'success' ||
+       needs.build-booking.result == 'success' ||
+       needs.build-payment.result == 'success' ||
+       needs.build-frontend.result == 'success')
+    uses: ./.github/workflows/deploy.yml
+    with:
+      event-service-changed: ${{ needs.detect-changes.outputs.event-service == 'true' }}
+      booking-service-changed: ${{ needs.detect-changes.outputs.booking-service == 'true' }}
+      payment-service-changed: ${{ needs.detect-changes.outputs.mock-payment-service == 'true' }}
+      frontend-changed: ${{ needs.detect-changes.outputs.frontend == 'true' }}
+      image-tag: ${{ github.sha }}
+    secrets: inherit

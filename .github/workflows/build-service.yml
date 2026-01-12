@@ -1,0 +1,87 @@
+name: Build and Test Service
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        required: true
+        type: string
+      service-path:
+        required: true
+        type: string
+      has-prisma:
+        required: false
+        type: boolean
+        default: false
+      has-dockerfile:
+        required: false
+        type: boolean
+        default: false
+      image-name:
+        required: false
+        type: string
+    outputs:
+      image-tag:
+        description: "Docker image tag (commit SHA)"
+        value: ${{ jobs.build-test.outputs.image-tag }}
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/ticketing
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.service-path }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ${{ inputs.service-path }}
+        run: npm ci
+      
+      - name: Generate Prisma Client
+        if: inputs.has-prisma
+        working-directory: ${{ inputs.service-path }}
+        run: npm run prisma:generate
+      
+      - name: Build
+        working-directory: ${{ inputs.service-path }}
+        run: npm run build
+      
+      - name: Run tests
+        working-directory: ${{ inputs.service-path }}
+        run: npm test
+        continue-on-error: true
+      
+      - name: Log in to registry
+        if: inputs.has-dockerfile
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build Docker image
+        if: inputs.has-dockerfile
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ inputs.image-name }}:${{ github.sha }} \
+                       -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ inputs.image-name }}:latest \
+                       ${{ inputs.service-path }}
+      
+      - name: Push Docker image
+        if: inputs.has-dockerfile
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ inputs.image-name }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ inputs.image-name }}:latest
+

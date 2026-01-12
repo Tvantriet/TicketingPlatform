@@ -1,9 +1,26 @@
 import { Request, Response } from 'express';
 import * as eventService from '../services/eventService.js';
+import * as r2Storage from '../services/r2Storage.js';
+
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
 
 export const createEvent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const event = await eventService.createEvent(req.body);
+    const multerReq = req as MulterRequest;
+    let imageUrl: string | undefined;
+    
+    // Upload image if provided
+    if (multerReq.file) {
+      const result = await r2Storage.uploadImage(multerReq.file);
+      imageUrl = result.url;
+    }
+    
+    const event = await eventService.createEvent({
+      ...req.body,
+      imageUrl,
+    });
     res.status(201).json(event);
   } catch (error) {
     if (error instanceof Error && error.message.includes('Missing required fields')) {
@@ -41,7 +58,30 @@ export const getEvent = async (req: Request, res: Response): Promise<void> => {
 
 export const updateEvent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const event = await eventService.updateEvent(req.params.id, req.body);
+    const multerReq = req as MulterRequest;
+    const existingEvent = await eventService.getEventById(req.params.id);
+    let imageUrl: string | undefined;
+    
+    // Upload new image if provided
+    if (multerReq.file) {
+      const result = await r2Storage.uploadImage(multerReq.file);
+      imageUrl = result.url;
+      
+      // Delete old image if exists
+      if (existingEvent.imageUrl) {
+        const oldKey = r2Storage.extractKeyFromUrl(existingEvent.imageUrl);
+        if (oldKey) {
+          await r2Storage.deleteImage(oldKey).catch(err => 
+            console.error('Failed to delete old image:', err)
+          );
+        }
+      }
+    }
+    
+    const event = await eventService.updateEvent(req.params.id, {
+      ...req.body,
+      ...(imageUrl !== undefined && { imageUrl }),
+    });
     res.json(event);
   } catch (error) {
     if (error instanceof Error) {
@@ -61,6 +101,18 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
 
 export const deleteEvent = async (req: Request, res: Response): Promise<void> => {
   try {
+    const event = await eventService.getEventById(req.params.id);
+    
+    // Delete image from R2 if exists
+    if (event.imageUrl) {
+      const key = r2Storage.extractKeyFromUrl(event.imageUrl);
+      if (key) {
+        await r2Storage.deleteImage(key).catch(err => 
+          console.error('Failed to delete image:', err)
+        );
+      }
+    }
+    
     await eventService.deleteEvent(req.params.id);
     res.status(204).send();
   } catch (error) {

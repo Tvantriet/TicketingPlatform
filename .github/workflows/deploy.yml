@@ -1,0 +1,165 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_call:
+    inputs:
+      event-service-changed:
+        required: false
+        type: boolean
+        default: false
+      booking-service-changed:
+        required: false
+        type: boolean
+        default: false
+      payment-service-changed:
+        required: false
+        type: boolean
+        default: false
+      frontend-changed:
+        required: false
+        type: boolean
+        default: false
+      image-tag:
+        required: true
+        type: string
+    secrets:
+      KUBECONFIG:
+        required: true
+      EVENT_DB_URL:
+        required: false
+      BOOKING_DB_URL:
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/ticketing
+
+jobs:
+  prisma-migrations:
+    if: inputs.event-service-changed || inputs.booking-service-changed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Run EventService migrations
+        if: inputs.event-service-changed
+        working-directory: EventService
+        env:
+          DATABASE_URL: ${{ secrets.EVENT_DB_URL }}
+        run: |
+          npm ci
+          npx prisma migrate deploy
+      
+      - name: Run BookingService migrations
+        if: inputs.booking-service-changed
+        working-directory: BookingService
+        env:
+          DATABASE_URL: ${{ secrets.BOOKING_DB_URL }}
+        run: |
+          npm ci
+          npx prisma migrate deploy
+
+  deploy-k8s:
+    needs: prisma-migrations
+    if: always() && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+      
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+      
+      - name: Update EventService
+        if: inputs.event-service-changed
+        run: |
+          kubectl set image deployment/eventservice eventservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-event:${{ inputs.image-tag }}
+          kubectl rollout status deployment/eventservice --timeout=5m
+      
+      - name: Update BookingService
+        if: inputs.booking-service-changed
+        run: |
+          kubectl set image deployment/bookingservice bookingservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-booking:${{ inputs.image-tag }}
+          kubectl rollout status deployment/bookingservice --timeout=5m
+      
+      - name: Update MockPaymentService
+        if: inputs.payment-service-changed
+        run: |
+          kubectl set image deployment/mockpaymentservice mockpaymentservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-payment:${{ inputs.image-tag }}
+          kubectl rollout status deployment/mockpaymentservice --timeout=5m
+      
+      - name: Update Frontend
+        if: inputs.frontend-changed
+        run: |
+          kubectl set image deployment/frontend frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ inputs.image-tag }}
+          kubectl rollout status deployment/frontend --timeout=5m
+
+  integration-tests:
+    needs: deploy-k8s
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install root dependencies
+        run: npm ci
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+      
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for all pods to be ready..."
+          kubectl wait --for=condition=ready pod -l app=eventservice --timeout=5m || true
+          kubectl wait --for=condition=ready pod -l app=booking --timeout=5m || true
+          kubectl wait --for=condition=ready pod -l app=mockpaymentservice --timeout=5m || true
+          kubectl wait --for=condition=ready pod -l app=gateway --timeout=5m || true
+          kubectl get pods
+      
+      - name: Set up port forwarding
+        run: |
+          # Start port forwarding in background
+          kubectl port-forward service/gateway 3000:3000 &
+          kubectl port-forward service/eventservice 3001:3001 &
+          kubectl port-forward service/bookingservice 3003:3003 &
+          kubectl port-forward service/mockpaymentservice 3002:3002 &
+          
+          # Wait for port forwards to be ready
+          sleep 10
+          
+          # Verify services are accessible
+          curl -f http://localhost:3000/health || echo "Gateway not ready yet"
+          curl -f http://localhost:3001/health || echo "EventService not ready yet"
+          curl -f http://localhost:3003/health || echo "BookingService not ready yet"
+          curl -f http://localhost:3002/health || echo "PaymentService not ready yet"
+      
+      - name: Run integration tests
+        env:
+          GATEWAY_URL: http://localhost:3000
+          EVENT_SERVICE_URL: http://localhost:3001
+          BOOKING_SERVICE_URL: http://localhost:3003
+          PAYMENT_SERVICE_URL: http://localhost:3002
+        run: |
+          npm run test:integration
+      
+      - name: Cleanup port forwarding
+        if: always()
+        run: |
+          pkill -f "kubectl port-forward" || true
+

@@ -8,6 +8,7 @@ export interface CreateEventData {
   date: string | Date;
   capacity: number | string;
   price?: number | string;
+  imageUrl?: string;
 }
 
 export interface UpdateEventData {
@@ -17,10 +18,11 @@ export interface UpdateEventData {
   date?: string | Date;
   capacity?: number | string;
   price?: number | string;
+  imageUrl?: string;
 }
 
 export const createEvent = async (data: CreateEventData): Promise<Event> => {
-  const { name, description, venue, date, capacity, price } = data;
+  const { name, description, venue, date, capacity, price, imageUrl } = data;
 
   if (!name || !venue || !date || !capacity) {
     throw new Error('Missing required fields: name, venue, date, capacity');
@@ -34,6 +36,7 @@ export const createEvent = async (data: CreateEventData): Promise<Event> => {
       date: new Date(date),
       capacity: parseInt(String(capacity)),
       price: price ? parseFloat(String(price)) : 0,
+      imageUrl: imageUrl || null,
     },
   });
 };
@@ -62,7 +65,7 @@ export const updateEvent = async (
   id: number | string,
   data: UpdateEventData
 ): Promise<Event> => {
-  const { name, description, venue, date, capacity, price } = data;
+  const { name, description, venue, date, capacity, price, imageUrl } = data;
 
   // Check if event exists
   const existingEvent = await prisma.event.findUnique({
@@ -81,6 +84,7 @@ export const updateEvent = async (
   if (date !== undefined) updateData.date = new Date(date);
   if (capacity !== undefined) updateData.capacity = parseInt(String(capacity));
   if (price !== undefined) updateData.price = parseFloat(String(price));
+  if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
 
   if (Object.keys(updateData).length === 0) {
     throw new Error('No fields to update');

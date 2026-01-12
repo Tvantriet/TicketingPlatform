@@ -1,0 +1,175 @@
+# Docker Compose for CI/CD testing
+# Includes all services + dependencies with proper health checks and ordering
+
+version: '3.8'
+
+services:
+  # Infrastructure
+  postgres-events:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: events
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ticketing-ci
+
+  postgres-bookings:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: bookings
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ticketing-ci
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ticketing-ci
+
+  # Services
+  event-service:
+    build:
+      context: ./EventService
+      dockerfile: dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres-events:5432/events
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres-events:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - ticketing-ci
+    restart: unless-stopped
+
+  booking-service:
+    build:
+      context: ./BookingService
+      dockerfile: dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres-bookings:5432/bookings
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      PORT: 3003
+      EVENT_SERVICE_URL: http://event-service:3001
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres-bookings:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - ticketing-ci
+    restart: unless-stopped
+
+  mock-payment-service:
+    build:
+      context: ./MockPaymentService
+      dockerfile: dockerfile
+    environment:
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      PORT: 3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - ticketing-ci
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./Gateway
+      dockerfile: dockerfile
+    environment:
+      PORT: 3000
+      EVENT_SERVICE_URL: http://event-service:3001
+      BOOKING_SERVICE_URL: http://booking-service:3003
+      PAYMENT_SERVICE_URL: http://mock-payment-service:3002
+      USER_SERVICE_URL: http://user-service:3004
+    ports:
+      - "3000:3000"
+    depends_on:
+      event-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      mock-payment-service:
+        condition: service_healthy
+    networks:
+      - ticketing-ci
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./UserService
+      dockerfile: dockerfile
+    environment:
+      PORT: 3004
+    ports:
+      - "3004:3004"
+    networks:
+      - ticketing-ci
+    restart: unless-stopped
+
+networks:
+  ticketing-ci:
+    driver: bridge
+
+volumes:
+  postgres-events-data:
+  postgres-bookings-data:
+  rabbitmq-data:
+

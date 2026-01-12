@@ -12,16 +12,15 @@ const EVENT_SERVICE = 'http://localhost:3001';
 export let options = {
   scenarios: {
     // Scenario 1: Gradual load increase on BookingService
-    // Should trigger autoscaling from 1 to ~3-4 pods
     booking_load: {
       executor: 'ramping-vus',
       startVUs: 1,
       stages: [
-        { duration: '30s', target: 10 },   // Ramp up to 10 users
-        { duration: '1m', target: 50 },    // Ramp up to 50 users (trigger scaling)
-        { duration: '2m', target: 100 },   // Peak load (max scaling)
-        { duration: '1m', target: 10 },    // Ramp down
-        { duration: '30s', target: 0 },    // Cool down
+        { duration: '10s', target: 50 },   // Ramp up to 10 users
+        { duration: '30s', target: 250 },    // Ramp up to 50 users (trigger scaling)
+        { duration: '1m', target: 500 },   // Peak load (max scaling)
+        { duration: '20s', target: 80 },    // Ramp down
+        { duration: '10s', target: 0 },    // Cool down
       ],
       gracefulRampDown: '30s',
       exec: 'bookingScenario',
@@ -49,7 +48,7 @@ export let options = {
   },
 };
 
-// Scenario 1: Booking workflow (CPU intensive)
+// Scenario 1: Booking workflow
 export function bookingScenario() {
   // Health check (lightweight)
   let healthRes = http.get(`${BOOKING_SERVICE}/health`);

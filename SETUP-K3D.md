@@ -13,6 +13,11 @@ k3d cluster create ticketing
 
 ### 2. Build Docker images
 ```powershell
+# Build Gateway
+cd Gateway
+docker build -t gateway:latest .
+cd ..
+
 # Build BookingService
 cd BookingService
 docker build -t bookingservice:latest .
@@ -27,11 +32,16 @@ cd ..
 cd MockPaymentService
 docker build -t mockpaymentservice:latest .
 cd ..
+
+# Build Frontend
+cd Frontend
+docker build -t frontend:latest .
+cd ..
 ```
 
 ### 3. Import images into k3d
 ```powershell
-k3d image import bookingservice:latest eventservice:latest mockpaymentservice:latest -c ticketing
+k3d image import gateway:latest bookingservice:latest eventservice:latest mockpaymentservice:latest frontend:latest -c ticketing
 ```
 
 ### 4. Deploy infrastructure (RabbitMQ only)
@@ -45,11 +55,6 @@ kubectl get pods -w
 ```
 (Press Ctrl+C when RabbitMQ shows "Running")
 
-### 5. Update DATABASE_URL in deployments
-Edit your deployment files to point to your cloud postgres:
-- `BookingService/deployment.yaml` - set DATABASE_URL env var
-- `EventService/deployment.yaml` - set DATABASE_URL env var
-
 Example:
 ```yaml
 env:
@@ -60,9 +65,11 @@ env:
 ### 6. Deploy services
 ```powershell
 kubectl apply -f k8s-services.yaml
+kubectl apply -f Gateway/deployment.yaml
 kubectl apply -f BookingService/deployment.yaml
 kubectl apply -f EventService/deployment.yaml
 kubectl apply -f MockPaymentService/deployment.yaml
+kubectl apply -f Frontend/deployment.yaml
 ```
 
 ### 7. Verify everything is running
@@ -85,6 +92,8 @@ kubectl run -it --rm load-generator --image=busybox --restart=Never -- /bin/sh -
 
 ```powershell
 # View logs
+kubectl logs -f deployment/frontend-deployment
+kubectl logs -f deployment/gateway-deployment
 kubectl logs -f deployment/booking-deployment
 kubectl logs -f deployment/eventservice-deployment
 kubectl logs -f deployment/mockpaymentservice-deployment
@@ -97,14 +106,27 @@ cd BookingService
 docker build -t bookingservice:latest .
 k3d image import bookingservice:latest -c ticketing
 kubectl rollout restart deployment/booking-deployment
+
+# Rebuild and redeploy frontend
+cd Frontend
+docker build -t frontend:latest .
+k3d image import frontend:latest -c ticketing
+kubectl rollout restart deployment/frontend-deployment
 ```
 
 ## Port Forwarding (for local access)
 
 ```powershell
+# Access Frontend (Web UI)
+kubectl port-forward svc/frontend 8080:80
+# Then open: http://localhost:8080
+
 # Access RabbitMQ management UI
 kubectl port-forward svc/rabbitmq 15672:15672
 # Then open: http://localhost:15672 (admin/admin)
+
+# Access Gateway
+kubectl port-forward svc/gateway 3000:3000
 
 # Access BookingService
 kubectl port-forward svc/bookingservice 3003:3003

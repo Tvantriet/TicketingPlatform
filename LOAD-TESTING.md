@@ -62,6 +62,7 @@ choco install k6
 # Terminal 1: Port forward services
 kubectl port-forward svc/bookingservice 3003:3003 &
 kubectl port-forward svc/eventservice 3001:3001 &
+kubectl port-forward svc/mockpaymentservcice 3002:3002
 
 # Terminal 2: Watch pods scale
 kubectl get pods -w

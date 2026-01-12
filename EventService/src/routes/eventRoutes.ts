@@ -7,13 +7,17 @@ import {
   deleteEvent,
 } from '../controllers/eventController.js';
 import { upload } from '../middleware/upload.js';
+import { authorize } from '../middleware/authorize.js';
 
 const router = express.Router();
 
-router.post('/', upload.single('image'), createEvent);
+// Admin-only routes
+router.post('/', authorize('admin'), upload.single('image'), createEvent);
+router.put('/:id', authorize('admin'), upload.single('image'), updateEvent);
+router.delete('/:id', authorize('admin'), deleteEvent);
+
+// Public routes (no auth required)
 router.get('/', getAllEvents);
 router.get('/:id', getEvent);
-router.put('/:id', upload.single('image'), updateEvent);
-router.delete('/:id', deleteEvent);
 
 export default router;

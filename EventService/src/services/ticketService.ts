@@ -168,26 +168,6 @@ export const releaseTicket = async (id: number | string): Promise<Ticket> => {
   });
 };
 
-export const releaseExpiredReservations = async (): Promise<number> => {
-  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-  
-  const result = await prisma.ticket.updateMany({
-    where: {
-      status: TicketStatus.RESERVED,
-      reservedAt: {
-        lt: tenMinutesAgo,
-      },
-    },
-    data: {
-      status: TicketStatus.AVAILABLE,
-      reservedAt: null,
-      transactionId: null,
-    },
-  });
-  
-  return result.count;
-};
-
 export const bookTicket = async (
   id: number | string,
   transactionId: string
@@ -238,6 +218,7 @@ export const bookTicket = async (
 
   return updatedTicket;
 };
+
 
 export const deleteTicket = async (id: number | string): Promise<boolean> => {
   const ticket = await prisma.ticket.findUnique({

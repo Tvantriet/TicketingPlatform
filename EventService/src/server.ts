@@ -7,6 +7,7 @@ import { startReceiver, closeReceivers } from './messaging/receiver.js';
 import { ROUTING_KEYS, QUEUES } from './messaging/messagingConfig.js';
 import * as ticketService from './services/ticketService.js';
 import prisma from './db/prisma.js';
+import { extractUserContext } from './middleware/userContext.js';
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(extractUserContext); // Extract user context from Gateway headers
 
 // Health check
 app.get('/health', (_req: Request, res: Response) => {

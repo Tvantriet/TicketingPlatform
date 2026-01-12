@@ -24,9 +24,6 @@ on:
       image-tag:
         description: "Docker image tag (commit SHA)"
         value: ${{ jobs.build-test.outputs.image-tag }}
-    secrets:
-      GITHUB_TOKEN:
-        required: true
 
 env:
   REGISTRY: ghcr.io

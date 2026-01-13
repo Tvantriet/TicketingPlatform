@@ -84,62 +84,76 @@ jobs:
             frontend:
               - 'Frontend/**'
 
-  build-services:
+  build-event:
     needs: detect-changes
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service-name: EventService
-            service-path: EventService
-            change-check: event-service
-            has-prisma: true
-            has-dockerfile: true
-            image-name: event
-          - service-name: BookingService
-            service-path: BookingService
-            change-check: booking-service
-            has-prisma: true
-            has-dockerfile: true
-            image-name: booking
-          - service-name: MockPaymentService
-            service-path: MockPaymentService
-            change-check: mock-payment-service
-            has-prisma: false
-            has-dockerfile: true
-            image-name: payment
-          - service-name: Gateway
-            service-path: Gateway
-            change-check: gateway
-            has-prisma: false
-            has-dockerfile: false
-            image-name: gateway
-          - service-name: UserService
-            service-path: UserService
-            change-check: user-service
-            has-prisma: true
-            has-dockerfile: false
-            image-name: user
-          - service-name: Frontend
-            service-path: Frontend
-            change-check: frontend
-            has-prisma: false
-            has-dockerfile: true
-            image-name: frontend
-    if: |
-      (matrix.change-check == 'event-service' && needs.detect-changes.outputs.event-service == 'true') ||
-      (matrix.change-check == 'booking-service' && needs.detect-changes.outputs.booking-service == 'true') ||
-      (matrix.change-check == 'mock-payment-service' && needs.detect-changes.outputs.mock-payment-service == 'true') ||
-      (matrix.change-check == 'gateway' && needs.detect-changes.outputs.gateway == 'true') ||
-      (matrix.change-check == 'user-service' && needs.detect-changes.outputs.user-service == 'true') ||
-      (matrix.change-check == 'frontend' && needs.detect-changes.outputs.frontend == 'true')
+    if: needs.detect-changes.outputs.event-service == 'true'
     uses: ./.github/workflows/build-service.yml
     with:
-      service-name: ${{ matrix.service-name }}
-      service-path: ${{ matrix.service-path }}
-      has-prisma: ${{ matrix.has-prisma }}
-      has-dockerfile: ${{ matrix.has-dockerfile }}
-      image-name: ${{ matrix.image-name }}
+      service-name: EventService
+      service-path: EventService
+      has-prisma: true
+      has-dockerfile: true
+      image-name: event
+    secrets: inherit
+
+  build-booking:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.booking-service == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: BookingService
+      service-path: BookingService
+      has-prisma: true
+      has-dockerfile: true
+      image-name: booking
+    secrets: inherit
+
+  build-payment:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.mock-payment-service == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: MockPaymentService
+      service-path: MockPaymentService
+      has-prisma: false
+      has-dockerfile: true
+      image-name: payment
+    secrets: inherit
+
+  build-gateway:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.gateway == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: Gateway
+      service-path: Gateway
+      has-prisma: false
+      has-dockerfile: false
+      image-name: gateway
+    secrets: inherit
+
+  build-user:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.user-service == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: UserService
+      service-path: UserService
+      has-prisma: true
+      has-dockerfile: false
+      image-name: user
+    secrets: inherit
+
+  build-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: Frontend
+      service-path: Frontend
+      has-prisma: false
+      has-dockerfile: true
+      image-name: frontend
     secrets: inherit
 
   trivy-container:
@@ -174,7 +188,7 @@ jobs:
           sarif_file: 'trivy-container-${{ matrix.image-name }}.sarif'
 
   deploy:
-    needs: [detect-changes, build-services]
+    needs: [detect-changes, build-event, build-booking, build-payment, build-gateway, build-user, build-frontend]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development'
     uses: ./.github/workflows/deploy.yml
     with:

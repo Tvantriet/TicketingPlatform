@@ -31,6 +31,26 @@ jest.mock('../../src/service/auditLogService.js', () => ({
   logLoginFailure: jest.fn(),
 }));
 
+// Type assertions for mocks
+const mockPrisma = prisma as unknown as {
+  user: {
+    findFirst: jest.Mock;
+    findUnique: jest.Mock;
+    create: jest.Mock;
+  };
+};
+const mockBcrypt = bcrypt as unknown as {
+  hash: jest.Mock;
+  compare: jest.Mock;
+};
+const mockJwt = jwt as unknown as {
+  sign: jest.Mock;
+  verify: jest.Mock;
+};
+const mockAuditLogService = auditLogService as unknown as {
+  logLoginFailure: jest.Mock;
+};
+
 describe('UserService Unit Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -47,7 +67,7 @@ describe('UserService Unit Tests', () => {
       updatedAt: new Date(),
     };
 
-    (prisma.user.findFirst as jest.Mock).mockResolvedValueOnce(existingUser);
+    (mockPrisma.user.findFirst as any).mockResolvedValueOnce(existingUser);
 
     const result = await register({
       userName: 'testuser',
@@ -57,7 +77,7 @@ describe('UserService Unit Tests', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Username already exists');
-    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
   });
 
   it('should reject login with invalid password and log failure', async () => {
@@ -71,9 +91,9 @@ describe('UserService Unit Tests', () => {
       updatedAt: new Date(),
     };
 
-    (prisma.user.findFirst as jest.Mock).mockResolvedValueOnce(user);
-    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-    (auditLogService.logLoginFailure as jest.Mock).mockResolvedValueOnce(undefined);
+    (mockPrisma.user.findFirst as any).mockResolvedValueOnce(user);
+    (mockBcrypt.compare as any).mockResolvedValueOnce(false);
+    (mockAuditLogService.logLoginFailure as any).mockResolvedValueOnce(undefined);
 
     const result = await login(
       { userName: 'testuser', password: 'wrongpassword' },
@@ -83,7 +103,7 @@ describe('UserService Unit Tests', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Invalid credentials');
-    expect(auditLogService.logLoginFailure).toHaveBeenCalledWith({
+    expect(mockAuditLogService.logLoginFailure).toHaveBeenCalledWith({
       userId: 1,
       attemptedUsername: 'testuser',
       attemptedEmail: 'test@example.com',
@@ -91,7 +111,7 @@ describe('UserService Unit Tests', () => {
       ipAddress: '127.0.0.1',
       userAgent: 'test-agent',
     });
-    expect(jwt.sign).not.toHaveBeenCalled();
+    expect(mockJwt.sign).not.toHaveBeenCalled();
   });
 
   it('should return user with audit logs when found by ID', async () => {
@@ -118,12 +138,12 @@ describe('UserService Unit Tests', () => {
       ],
     };
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce(mockUser);
+    (mockPrisma.user.findUnique as any).mockResolvedValueOnce(mockUser);
 
     const result = await getUserById(1);
 
     expect(result).toEqual(mockUser);
-    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: 1 },
       include: {
         auditLogs: {

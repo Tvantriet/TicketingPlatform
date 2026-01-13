@@ -28,6 +28,10 @@ on:
 env:
   REGISTRY: ghcr.io
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-test:
     runs-on: ubuntu-latest

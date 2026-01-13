@@ -40,6 +40,10 @@ on:
       USER_DB_URL:
         required: false
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/ticketing
@@ -69,10 +73,12 @@ jobs:
             echo "environment=development" >> $GITHUB_OUTPUT
           fi
           echo "Deploying to namespace: $(cat $GITHUB_OUTPUT | grep namespace | cut -d'=' -f2)"
+  
   prisma-migrations:
     needs: determine-environment
     if: inputs.event-service-changed || inputs.booking-service-changed || inputs.user-service-changed
     runs-on: ubuntu-latest
+    environment: ${{ needs.determine-environment.outputs.environment }}
     steps:
       - uses: actions/checkout@v4
       
@@ -82,46 +88,38 @@ jobs:
       
       - name: Run EventService migrations
         if: inputs.event-service-changed
-        working-directory: EventService
-        env:
-          DATABASE_URL: ${{ secrets.EVENT_DB_URL }}
-          NAMESPACE: ${{ needs.determine-environment.outputs.namespace }}
-        run: |
-          echo "Running migrations for EventService in namespace: $NAMESPACE"
-          npm ci
-          npx prisma migrate deploy
+        uses: ./.github/actions/run-prisma-migrations
+        with:
+          service-path: EventService
+          database-url: ${{ secrets.EVENT_DB_URL }}
+          namespace: ${{ needs.determine-environment.outputs.namespace }}
       
       - name: Run BookingService migrations
         if: inputs.booking-service-changed
-        working-directory: BookingService
-        env:
-          DATABASE_URL: ${{ secrets.BOOKING_DB_URL }}
-          NAMESPACE: ${{ needs.determine-environment.outputs.namespace }}
-        run: |
-          echo "Running migrations for BookingService in namespace: $NAMESPACE"
-          npm ci
-          npx prisma migrate deploy
+        uses: ./.github/actions/run-prisma-migrations
+        with:
+          service-path: BookingService
+          database-url: ${{ secrets.BOOKING_DB_URL }}
+          namespace: ${{ needs.determine-environment.outputs.namespace }}
       
       - name: Run UserService migrations
         if: inputs.user-service-changed
-        working-directory: UserService
-        env:
-          DATABASE_URL: ${{ secrets.USER_DB_URL }}
-          NAMESPACE: ${{ needs.determine-environment.outputs.namespace }}
-        run: |
-          echo "Running migrations for UserService in namespace: $NAMESPACE"
-          npm ci
-          npx prisma migrate deploy
+        uses: ./.github/actions/run-prisma-migrations
+        with:
+          service-path: UserService
+          database-url: ${{ secrets.USER_DB_URL }}
+          namespace: ${{ needs.determine-environment.outputs.namespace }}
 
   deploy-k8s:
     needs: [determine-environment, prisma-migrations]
     if: always() && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
     runs-on: ubuntu-latest
+    environment: ${{ needs.determine-environment.outputs.environment }}
     steps:
       - uses: actions/checkout@v4
       
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@v4
       
       - name: Configure kubectl
         run: |
@@ -184,6 +182,7 @@ jobs:
   integration-tests:
     needs: [determine-environment, deploy-k8s]
     runs-on: ubuntu-latest
+    environment: ${{ needs.determine-environment.outputs.environment }}
     steps:
       - uses: actions/checkout@v4
       
@@ -195,7 +194,7 @@ jobs:
         run: npm ci
       
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@v4
       
       - name: Configure kubectl
         run: |

@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, release, development]
 
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -23,7 +27,7 @@ jobs:
           node-version: '20'
       
       - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
+        uses: sonarsource/sonarqube-scan-action@v2.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -35,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Run Trivy vulnerability scanner in filesystem mode
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -80,76 +84,62 @@ jobs:
             frontend:
               - 'Frontend/**'
 
-  build-event:
+  build-services:
     needs: detect-changes
-    if: needs.detect-changes.outputs.event-service == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service-name: EventService
+            service-path: EventService
+            change-check: event-service
+            has-prisma: true
+            has-dockerfile: true
+            image-name: event
+          - service-name: BookingService
+            service-path: BookingService
+            change-check: booking-service
+            has-prisma: true
+            has-dockerfile: true
+            image-name: booking
+          - service-name: MockPaymentService
+            service-path: MockPaymentService
+            change-check: mock-payment-service
+            has-prisma: false
+            has-dockerfile: true
+            image-name: payment
+          - service-name: Gateway
+            service-path: Gateway
+            change-check: gateway
+            has-prisma: false
+            has-dockerfile: false
+            image-name: gateway
+          - service-name: UserService
+            service-path: UserService
+            change-check: user-service
+            has-prisma: true
+            has-dockerfile: false
+            image-name: user
+          - service-name: Frontend
+            service-path: Frontend
+            change-check: frontend
+            has-prisma: false
+            has-dockerfile: true
+            image-name: frontend
+    if: |
+      (matrix.change-check == 'event-service' && needs.detect-changes.outputs.event-service == 'true') ||
+      (matrix.change-check == 'booking-service' && needs.detect-changes.outputs.booking-service == 'true') ||
+      (matrix.change-check == 'mock-payment-service' && needs.detect-changes.outputs.mock-payment-service == 'true') ||
+      (matrix.change-check == 'gateway' && needs.detect-changes.outputs.gateway == 'true') ||
+      (matrix.change-check == 'user-service' && needs.detect-changes.outputs.user-service == 'true') ||
+      (matrix.change-check == 'frontend' && needs.detect-changes.outputs.frontend == 'true')
     uses: ./.github/workflows/build-service.yml
     with:
-      service-name: EventService
-      service-path: EventService
-      has-prisma: true
-      has-dockerfile: true
-      image-name: event
-    secrets: inherit
-
-  build-booking:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.booking-service == 'true'
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: BookingService
-      service-path: BookingService
-      has-prisma: true
-      has-dockerfile: true
-      image-name: booking
-    secrets: inherit
-
-  build-payment:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.mock-payment-service == 'true'
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: MockPaymentService
-      service-path: MockPaymentService
-      has-prisma: false
-      has-dockerfile: true
-      image-name: payment
-    secrets: inherit
-
-  build-gateway:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.gateway == 'true'
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: Gateway
-      service-path: Gateway
-      has-prisma: false
-      has-dockerfile: false
-      image-name: gateway
-    secrets: inherit
-
-  build-user:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.user-service == 'true'
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: UserService
-      service-path: UserService
-      has-prisma: true
-      has-dockerfile: false
-      image-name: user
-    secrets: inherit
-
-  build-frontend:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: Frontend
-      service-path: Frontend
-      has-prisma: false
-      has-dockerfile: true
-      image-name: frontend
+      service-name: ${{ matrix.service-name }}
+      service-path: ${{ matrix.service-path }}
+      has-prisma: ${{ matrix.has-prisma }}
+      has-dockerfile: ${{ matrix.has-dockerfile }}
+      image-name: ${{ matrix.image-name }}
     secrets: inherit
 
   trivy-container:
@@ -171,7 +161,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Trivy vulnerability scanner in container mode
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ghcr.io/${{ env.IMAGE_PREFIX }}-${{ matrix.image-name }}:latest
           format: 'sarif'
@@ -184,16 +174,8 @@ jobs:
           sarif_file: 'trivy-container-${{ matrix.image-name }}.sarif'
 
   deploy:
-    needs: [detect-changes, build-event, build-booking, build-payment, build-gateway, build-user, build-frontend]
-    if: |
-      always() &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development') &&
-      (needs.build-event.result == 'success' || needs.build-event.result == 'skipped') &&
-      (needs.build-booking.result == 'success' || needs.build-booking.result == 'skipped') &&
-      (needs.build-payment.result == 'success' || needs.build-payment.result == 'skipped') &&
-      (needs.build-gateway.result == 'success' || needs.build-gateway.result == 'skipped') &&
-      (needs.build-user.result == 'success' || needs.build-user.result == 'skipped') &&
-      (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped')
+    needs: [detect-changes, build-services]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development'
     uses: ./.github/workflows/deploy.yml
     with:
       event-service-changed: ${{ needs.detect-changes.outputs.event-service == 'true' }}

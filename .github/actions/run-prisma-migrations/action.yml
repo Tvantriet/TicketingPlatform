@@ -1,0 +1,25 @@
+name: 'Run Prisma Migrations'
+description: 'Run Prisma migrations for a service'
+inputs:
+  service-path:
+    description: 'Path to the service directory'
+    required: true
+  database-url:
+    description: 'Database connection URL'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Prisma migrations
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      env:
+        DATABASE_URL: ${{ inputs.database-url }}
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        echo "Running migrations for ${{ inputs.service-path }} in namespace: $NAMESPACE"
+        npm ci
+        npx prisma migrate deploy

@@ -116,11 +116,11 @@ jobs:
     needs: [detect-changes, build-event, build-booking, build-payment, build-frontend]
     if: |
       always() &&
-      github.ref == 'refs/heads/main' &&
-      (needs.build-event.result == 'success' ||
-       needs.build-booking.result == 'success' ||
-       needs.build-payment.result == 'success' ||
-       needs.build-frontend.result == 'success')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development') &&
+      (needs.build-event.result == 'success' || needs.build-event.result == 'skipped') &&
+      (needs.build-booking.result == 'success' || needs.build-booking.result == 'skipped') &&
+      (needs.build-payment.result == 'success' || needs.build-payment.result == 'skipped') &&
+      (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped')
     uses: ./.github/workflows/deploy.yml
     with:
       event-service-changed: ${{ needs.detect-changes.outputs.event-service == 'true' }}

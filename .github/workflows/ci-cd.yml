@@ -91,7 +91,7 @@ jobs:
     with:
       service-name: UserService
       service-path: UserService
-      has-prisma: false
+      has-prisma: true
       has-dockerfile: false
       image-name: user
     secrets: inherit

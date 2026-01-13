@@ -10,7 +10,8 @@
     "dev": "tsc && node dist/server.js",
     "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest",
     "test:unit": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --testPathPattern=unit",
-    "test:watch": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch"
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
+    "prisma:generate": "prisma generate"
   },
   "author": "",
   "license": "ISC",

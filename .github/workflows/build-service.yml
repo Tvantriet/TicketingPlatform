@@ -27,7 +27,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/ticketing
 
 jobs:
   build-test:
@@ -36,6 +35,10 @@ jobs:
       image-tag: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Set image prefix
+        run: |
+          echo "IMAGE_PREFIX=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/ticketing" >> $GITHUB_ENV
       
       - uses: actions/setup-node@v4
         with:

@@ -7,8 +7,47 @@ on:
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  trivy-filesystem:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner in filesystem mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -111,6 +150,38 @@ jobs:
       has-dockerfile: true
       image-name: frontend
     secrets: inherit
+
+  trivy-container:
+    runs-on: ubuntu-latest
+    needs: [build-event, build-booking, build-payment, build-frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        image-name: [event, booking, payment, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set image prefix
+        run: |
+          echo "IMAGE_PREFIX=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/ticketing" >> $GITHUB_ENV
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run Trivy vulnerability scanner in container mode
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ env.IMAGE_PREFIX }}-${{ matrix.image-name }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-container-${{ matrix.image-name }}.sarif'
+          severity: 'CRITICAL,HIGH'
+      - name: Upload Trivy container results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-container-${{ matrix.image-name }}.sarif'
 
   deploy:
     needs: [detect-changes, build-event, build-booking, build-payment, build-gateway, build-user, build-frontend]

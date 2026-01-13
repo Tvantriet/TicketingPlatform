@@ -113,10 +113,13 @@ jobs:
           npm ci
           npx prisma migrate deploy
 
-  setup-namespace:
-    needs: determine-environment
+  deploy-k8s:
+    needs: [determine-environment, prisma-migrations]
+    if: always() && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
       
@@ -125,92 +128,58 @@ jobs:
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
       
+      - name: Set namespace context
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          echo "Deploying to namespace: $NAMESPACE"
+          kubectl config set-context --current --namespace=$NAMESPACE || echo "Namespace $NAMESPACE may not exist yet"
+      
       - name: Ensure namespace exists
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          echo "Ensuring namespace exists: $NAMESPACE"
           kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-
-  deploy-event-service:
-    needs: [determine-environment, prisma-migrations, setup-namespace]
-    if: always() && inputs.event-service-changed && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
-    uses: ./.github/workflows/deploy-service.yml
-    with:
-      service-name: eventservice
-      image-name: event
-      namespace: ${{ needs.determine-environment.outputs.namespace }}
-      image-tag: ${{ inputs.image-tag }}
-    secrets:
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
-
-  deploy-booking-service:
-    needs: [determine-environment, prisma-migrations, setup-namespace]
-    if: always() && inputs.booking-service-changed && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
-    uses: ./.github/workflows/deploy-service.yml
-    with:
-      service-name: bookingservice
-      image-name: booking
-      namespace: ${{ needs.determine-environment.outputs.namespace }}
-      image-tag: ${{ inputs.image-tag }}
-    secrets:
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
-
-  deploy-payment-service:
-    needs: [determine-environment, setup-namespace]
-    if: inputs.payment-service-changed
-    uses: ./.github/workflows/deploy-service.yml
-    with:
-      service-name: mockpaymentservice
-      image-name: payment
-      namespace: ${{ needs.determine-environment.outputs.namespace }}
-      image-tag: ${{ inputs.image-tag }}
-    secrets:
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
-
-  deploy-frontend:
-    needs: [determine-environment, setup-namespace]
-    if: inputs.frontend-changed
-    uses: ./.github/workflows/deploy-service.yml
-    with:
-      service-name: frontend
-      image-name: frontend
-      namespace: ${{ needs.determine-environment.outputs.namespace }}
-      image-tag: ${{ inputs.image-tag }}
-    secrets:
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
-
-  deploy-gateway:
-    needs: [determine-environment, setup-namespace]
-    if: inputs.gateway-changed
-    uses: ./.github/workflows/deploy-service.yml
-    with:
-      service-name: gateway
-      image-name: gateway
-      namespace: ${{ needs.determine-environment.outputs.namespace }}
-      image-tag: ${{ inputs.image-tag }}
-    secrets:
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
-
-  deploy-user-service:
-    needs: [determine-environment, prisma-migrations, setup-namespace]
-    if: always() && inputs.user-service-changed && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
-    uses: ./.github/workflows/deploy-service.yml
-    with:
-      service-name: userservice
-      image-name: user
-      namespace: ${{ needs.determine-environment.outputs.namespace }}
-      image-tag: ${{ inputs.image-tag }}
-    secrets:
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
-
-  deploy-k8s:
-    needs: [deploy-event-service, deploy-booking-service, deploy-payment-service, deploy-frontend, deploy-gateway, deploy-user-service]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deployment summary
+      
+      - name: Update EventService
+        if: inputs.event-service-changed
         run: |
-          echo "All service deployments completed"
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl set image deployment/eventservice eventservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-event:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/eventservice --timeout=5m -n $NAMESPACE
+      
+      - name: Update BookingService
+        if: inputs.booking-service-changed
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl set image deployment/bookingservice bookingservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-booking:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/bookingservice --timeout=5m -n $NAMESPACE
+      
+      - name: Update MockPaymentService
+        if: inputs.payment-service-changed
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl set image deployment/mockpaymentservice mockpaymentservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-payment:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/mockpaymentservice --timeout=5m -n $NAMESPACE
+      
+      - name: Update Frontend
+        if: inputs.frontend-changed
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl set image deployment/frontend frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/frontend --timeout=5m -n $NAMESPACE
+      
+      - name: Update Gateway
+        if: inputs.gateway-changed
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl set image deployment/gateway gateway=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-gateway:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/gateway --timeout=5m -n $NAMESPACE
+      
+      - name: Update UserService
+        if: inputs.user-service-changed
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl set image deployment/userservice userservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-user:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/userservice --timeout=5m -n $NAMESPACE
 
   integration-tests:
     needs: [determine-environment, deploy-k8s]

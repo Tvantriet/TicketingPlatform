@@ -28,7 +28,7 @@ export async function verifyTokenWithUserService(token: string): Promise<TokenVe
       };
     }
 
-    const data = await response.json();
+    const data = await response.json() as { userId: number; userName: string; role?: string };
     return {
       valid: true,
       userId: data.userId,

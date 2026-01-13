@@ -31,5 +31,5 @@ export function createProxyOptions(requireAuth: boolean = true): Partial<Options
       
       console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} -> ${proxyReq.path}${authReq.userId ? ` [User: ${authReq.userId}]` : ''}`);
     }
-  };
+  } as Partial<Options>;
 }

@@ -8,7 +8,16 @@
 
 ### 1. Create k3d cluster
 ```powershell
-k3d cluster create ticketing
+k3d cluster create ticketing --api-port 6550 --port "8080:80@loadbalancer"
+```
+
+```powershell
+kubectl config set-cluster k3d-ticketing --server=https://127.0.0.1:6550
+```
+
+Verify the connection:
+```powershell
+kubectl cluster-info
 ```
 
 ### 2. Build Docker images
@@ -137,4 +146,43 @@ kubectl port-forward svc/eventservice 3001:3001
 # Access MockPaymentService
 kubectl port-forward svc/mockpaymentservice 3002:3002
 ```
+
+## Troubleshooting
+
+### kubectl Connection Issues
+
+If `kubectl cluster-info` fails with connection errors:
+
+1. **Check if the cluster is running:**
+   ```powershell
+   k3d cluster list
+   ```
+
+2. **Verify the API port:**
+   ```powershell
+   kubectl config view
+   ```
+   Look for the server URL under the cluster configuration.
+
+3. **Manually set the cluster server URL:**
+   ```powershell
+   kubectl config set-cluster k3d-ticketing --server=https://127.0.0.1:6550
+   ```
+
+4. **If using a different API port, recreate the cluster:**
+   ```powershell
+   k3d cluster delete ticketing
+   k3d cluster create ticketing --api-port 6550 --port "8080:80@loadbalancer"
+   ```
+
+5. **Verify KUBECONFIG environment variable (if needed):**
+   ```powershell
+   $env:KUBECONFIG = "C:\Users\$env:USERNAME\.kube\config"
+   ```
+
+### Common Issues
+
+- **"No connection could be made"**: The cluster might not be running or the API port is incorrect
+- **"host.docker.internal" errors**: Use `127.0.0.1` instead of `0.0.0.0` or `host.docker.internal` for the server URL
+- **Port conflicts**: Ensure ports 6550 (API) and 8080 (loadbalancer) are not in use
 

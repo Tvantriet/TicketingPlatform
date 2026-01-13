@@ -15,7 +15,7 @@ export async function registerUser(req: Request, res: Response) {
       return res.status(400).json({ error: result.error });
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'User registered successfully',
       token: result.token,
       user: result.user
@@ -27,7 +27,7 @@ export async function registerUser(req: Request, res: Response) {
         details: error.errors
       });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -46,7 +46,7 @@ export async function loginUser(req: Request, res: Response) {
       return res.status(401).json({ error: result.error });
     }
 
-    res.json({
+    return res.json({
       message: 'Login successful',
       token: result.token,
       user: result.user
@@ -58,7 +58,7 @@ export async function loginUser(req: Request, res: Response) {
         details: error.errors
       });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -74,7 +74,7 @@ export async function getCurrentUser(req: Request, res: Response) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({
+    return res.json({
       id: user.id,
       userName: user.userName,
       email: user.email,
@@ -82,7 +82,7 @@ export async function getCurrentUser(req: Request, res: Response) {
       updatedAt: user.updatedAt
     });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -98,7 +98,7 @@ export async function getUserById(req: Request, res: Response) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({
+    return res.json({
       id: user.id,
       userName: user.userName,
       email: user.email,
@@ -106,7 +106,7 @@ export async function getUserById(req: Request, res: Response) {
       updatedAt: user.updatedAt
     });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -119,9 +119,9 @@ export async function getUsers(req: Request, res: Response) {
     const take = Math.min(parseInt(req.query.take as string) || 50, 100);
 
     const result = await userService.getUsers(skip, take);
-    res.json(result);
+    return res.json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -139,7 +139,7 @@ export async function updateUser(req: Request, res: Response) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({
+    return res.json({
       id: user.id,
       userName: user.userName,
       email: user.email,
@@ -152,7 +152,7 @@ export async function updateUser(req: Request, res: Response) {
         details: error.errors
       });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -165,8 +165,8 @@ export async function getUserAuditLogs(req: Request, res: Response) {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
 
     const logs = await userService.getUserAuditLogs(userId, limit);
-    res.json(logs);
+    return res.json(logs);
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -19,7 +19,7 @@ app.set('trust proxy', true);
 app.use('/api/users', userRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'user-service' });
 });
 

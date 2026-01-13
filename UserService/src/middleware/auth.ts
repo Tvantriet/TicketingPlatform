@@ -25,5 +25,5 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
   (req as AuthRequest).userId = decoded.userId;
   (req as AuthRequest).userName = decoded.userName;
-  next();
+  return next();
 }

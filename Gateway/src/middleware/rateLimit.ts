@@ -2,6 +2,12 @@ import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 import { AuthRequest } from './auth.js';
 
+interface RateLimitRequest extends Request {
+  rateLimit?: {
+    resetTime?: number;
+  };
+}
+
 /**
  * Strict rate limiter for authentication endpoints
  * Prevents brute force attacks on login/register
@@ -15,7 +21,7 @@ export const authRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (req: RateLimitRequest, res: Response) => {
     res.status(429).json({
       error: 'Too many authentication attempts',
       message: 'Please try again after 15 minutes',
@@ -42,7 +48,7 @@ export const apiRateLimiter = rateLimit({
     const authReq = req as AuthRequest;
     return authReq.userId ? `user:${authReq.userId}` : req.ip || 'unknown';
   },
-  handler: (req: Request, res: Response) => {
+  handler: (req: RateLimitRequest, res: Response) => {
     res.status(429).json({
       error: 'Too many requests',
       message: 'Please slow down',
@@ -64,7 +70,7 @@ export const publicRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (req: RateLimitRequest, res: Response) => {
     res.status(429).json({
       error: 'Too many requests',
       message: 'Please try again later',

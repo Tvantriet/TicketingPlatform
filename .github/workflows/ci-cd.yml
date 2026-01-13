@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, develop, development]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   detect-changes:
     runs-on: ubuntu-latest

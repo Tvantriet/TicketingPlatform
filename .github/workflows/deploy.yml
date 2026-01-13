@@ -19,6 +19,14 @@ on:
         required: false
         type: boolean
         default: false
+      gateway-changed:
+        required: false
+        type: boolean
+        default: false
+      user-service-changed:
+        required: false
+        type: boolean
+        default: false
       image-tag:
         required: true
         type: string
@@ -29,14 +37,41 @@ on:
         required: false
       BOOKING_DB_URL:
         required: false
+      USER_DB_URL:
+        required: false
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/ticketing
 
 jobs:
+  determine-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      namespace: ${{ steps.env.outputs.namespace }}
+      environment: ${{ steps.env.outputs.environment }}
+    steps:
+      - name: Determine environment from branch
+        id: env
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          if [ "$BRANCH_NAME" = "main" ]; then
+            echo "namespace=ticketing-prod" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
+          elif [ "$BRANCH_NAME" = "release" ]; then
+            echo "namespace=ticketing-staging" >> $GITHUB_OUTPUT
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          elif [ "$BRANCH_NAME" = "development" ]; then
+            echo "namespace=ticketing-dev" >> $GITHUB_OUTPUT
+            echo "environment=development" >> $GITHUB_OUTPUT
+          else
+            echo "namespace=ticketing-dev" >> $GITHUB_OUTPUT
+            echo "environment=development" >> $GITHUB_OUTPUT
+          fi
+          echo "Deploying to namespace: $(cat $GITHUB_OUTPUT | grep namespace | cut -d'=' -f2)"
   prisma-migrations:
-    if: inputs.event-service-changed || inputs.booking-service-changed
+    needs: determine-environment
+    if: inputs.event-service-changed || inputs.booking-service-changed || inputs.user-service-changed
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +85,9 @@ jobs:
         working-directory: EventService
         env:
           DATABASE_URL: ${{ secrets.EVENT_DB_URL }}
+          NAMESPACE: ${{ needs.determine-environment.outputs.namespace }}
         run: |
+          echo "Running migrations for EventService in namespace: $NAMESPACE"
           npm ci
           npx prisma migrate deploy
       
@@ -59,17 +96,27 @@ jobs:
         working-directory: BookingService
         env:
           DATABASE_URL: ${{ secrets.BOOKING_DB_URL }}
+          NAMESPACE: ${{ needs.determine-environment.outputs.namespace }}
         run: |
+          echo "Running migrations for BookingService in namespace: $NAMESPACE"
+          npm ci
+          npx prisma migrate deploy
+      
+      - name: Run UserService migrations
+        if: inputs.user-service-changed
+        working-directory: UserService
+        env:
+          DATABASE_URL: ${{ secrets.USER_DB_URL }}
+          NAMESPACE: ${{ needs.determine-environment.outputs.namespace }}
+        run: |
+          echo "Running migrations for UserService in namespace: $NAMESPACE"
           npm ci
           npx prisma migrate deploy
 
-  deploy-k8s:
-    needs: prisma-migrations
-    if: always() && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
+  setup-namespace:
+    needs: determine-environment
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
       
@@ -78,32 +125,95 @@ jobs:
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
       
-      - name: Update EventService
-        if: inputs.event-service-changed
+      - name: Ensure namespace exists
         run: |
-          kubectl set image deployment/eventservice eventservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-event:${{ inputs.image-tag }}
-          kubectl rollout status deployment/eventservice --timeout=5m
-      
-      - name: Update BookingService
-        if: inputs.booking-service-changed
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          echo "Ensuring namespace exists: $NAMESPACE"
+          kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+  deploy-event-service:
+    needs: [determine-environment, prisma-migrations, setup-namespace]
+    if: always() && inputs.event-service-changed && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service-name: eventservice
+      image-name: event
+      namespace: ${{ needs.determine-environment.outputs.namespace }}
+      image-tag: ${{ inputs.image-tag }}
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+  deploy-booking-service:
+    needs: [determine-environment, prisma-migrations, setup-namespace]
+    if: always() && inputs.booking-service-changed && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service-name: bookingservice
+      image-name: booking
+      namespace: ${{ needs.determine-environment.outputs.namespace }}
+      image-tag: ${{ inputs.image-tag }}
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+  deploy-payment-service:
+    needs: [determine-environment, setup-namespace]
+    if: inputs.payment-service-changed
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service-name: mockpaymentservice
+      image-name: payment
+      namespace: ${{ needs.determine-environment.outputs.namespace }}
+      image-tag: ${{ inputs.image-tag }}
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+  deploy-frontend:
+    needs: [determine-environment, setup-namespace]
+    if: inputs.frontend-changed
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service-name: frontend
+      image-name: frontend
+      namespace: ${{ needs.determine-environment.outputs.namespace }}
+      image-tag: ${{ inputs.image-tag }}
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+  deploy-gateway:
+    needs: [determine-environment, setup-namespace]
+    if: inputs.gateway-changed
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service-name: gateway
+      image-name: gateway
+      namespace: ${{ needs.determine-environment.outputs.namespace }}
+      image-tag: ${{ inputs.image-tag }}
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+  deploy-user-service:
+    needs: [determine-environment, prisma-migrations, setup-namespace]
+    if: always() && inputs.user-service-changed && (needs.prisma-migrations.result == 'success' || needs.prisma-migrations.result == 'skipped')
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service-name: userservice
+      image-name: user
+      namespace: ${{ needs.determine-environment.outputs.namespace }}
+      image-tag: ${{ inputs.image-tag }}
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+  deploy-k8s:
+    needs: [deploy-event-service, deploy-booking-service, deploy-payment-service, deploy-frontend, deploy-gateway, deploy-user-service]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment summary
         run: |
-          kubectl set image deployment/bookingservice bookingservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-booking:${{ inputs.image-tag }}
-          kubectl rollout status deployment/bookingservice --timeout=5m
-      
-      - name: Update MockPaymentService
-        if: inputs.payment-service-changed
-        run: |
-          kubectl set image deployment/mockpaymentservice mockpaymentservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-payment:${{ inputs.image-tag }}
-          kubectl rollout status deployment/mockpaymentservice --timeout=5m
-      
-      - name: Update Frontend
-        if: inputs.frontend-changed
-        run: |
-          kubectl set image deployment/frontend frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ inputs.image-tag }}
-          kubectl rollout status deployment/frontend --timeout=5m
+          echo "All service deployments completed"
 
   integration-tests:
-    needs: deploy-k8s
+    needs: [determine-environment, deploy-k8s]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,20 +235,22 @@ jobs:
       
       - name: Wait for services to be ready
         run: |
-          echo "Waiting for all pods to be ready..."
-          kubectl wait --for=condition=ready pod -l app=eventservice --timeout=5m || true
-          kubectl wait --for=condition=ready pod -l app=booking --timeout=5m || true
-          kubectl wait --for=condition=ready pod -l app=mockpaymentservice --timeout=5m || true
-          kubectl wait --for=condition=ready pod -l app=gateway --timeout=5m || true
-          kubectl get pods
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          echo "Waiting for all pods to be ready in namespace: $NAMESPACE"
+          kubectl wait --for=condition=ready pod -l app=eventservice --timeout=5m -n $NAMESPACE || true
+          kubectl wait --for=condition=ready pod -l app=booking --timeout=5m -n $NAMESPACE || true
+          kubectl wait --for=condition=ready pod -l app=mockpaymentservice --timeout=5m -n $NAMESPACE || true
+          kubectl wait --for=condition=ready pod -l app=gateway --timeout=5m -n $NAMESPACE || true
+          kubectl get pods -n $NAMESPACE
       
       - name: Set up port forwarding
         run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
           # Start port forwarding in background
-          kubectl port-forward service/gateway 3000:3000 &
-          kubectl port-forward service/eventservice 3001:3001 &
-          kubectl port-forward service/bookingservice 3003:3003 &
-          kubectl port-forward service/mockpaymentservice 3002:3002 &
+          kubectl port-forward service/gateway 3000:3000 -n $NAMESPACE &
+          kubectl port-forward service/eventservice 3001:3001 -n $NAMESPACE &
+          kubectl port-forward service/bookingservice 3003:3003 -n $NAMESPACE &
+          kubectl port-forward service/mockpaymentservice 3002:3002 -n $NAMESPACE &
           
           # Wait for port forwards to be ready
           sleep 10
@@ -155,6 +267,7 @@ jobs:
           EVENT_SERVICE_URL: http://localhost:3001
           BOOKING_SERVICE_URL: http://localhost:3003
           PAYMENT_SERVICE_URL: http://localhost:3002
+          ENVIRONMENT: ${{ needs.determine-environment.outputs.environment }}
         run: |
           npm run test:integration
       

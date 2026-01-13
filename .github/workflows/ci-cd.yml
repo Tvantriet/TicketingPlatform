@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop, development]
+    branches: [main, release, development]
 
 permissions:
   contents: read
@@ -113,13 +113,15 @@ jobs:
     secrets: inherit
 
   deploy:
-    needs: [detect-changes, build-event, build-booking, build-payment, build-frontend]
+    needs: [detect-changes, build-event, build-booking, build-payment, build-gateway, build-user, build-frontend]
     if: |
       always() &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development') &&
       (needs.build-event.result == 'success' || needs.build-event.result == 'skipped') &&
       (needs.build-booking.result == 'success' || needs.build-booking.result == 'skipped') &&
       (needs.build-payment.result == 'success' || needs.build-payment.result == 'skipped') &&
+      (needs.build-gateway.result == 'success' || needs.build-gateway.result == 'skipped') &&
+      (needs.build-user.result == 'success' || needs.build-user.result == 'skipped') &&
       (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped')
     uses: ./.github/workflows/deploy.yml
     with:
@@ -127,5 +129,7 @@ jobs:
       booking-service-changed: ${{ needs.detect-changes.outputs.booking-service == 'true' }}
       payment-service-changed: ${{ needs.detect-changes.outputs.mock-payment-service == 'true' }}
       frontend-changed: ${{ needs.detect-changes.outputs.frontend == 'true' }}
+      gateway-changed: ${{ needs.detect-changes.outputs.gateway == 'true' }}
+      user-service-changed: ${{ needs.detect-changes.outputs.user-service == 'true' }}
       image-tag: ${{ github.sha }}
     secrets: inherit

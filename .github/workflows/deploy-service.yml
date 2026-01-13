@@ -1,0 +1,47 @@
+name: Deploy Single Service
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        required: true
+        type: string
+      image-name:
+        required: true
+        type: string
+      namespace:
+        required: true
+        type: string
+      image-tag:
+        required: true
+        type: string
+    secrets:
+      KUBECONFIG:
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/ticketing
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+      
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+      
+      - name: Deploy ${{ inputs.service-name }}
+        run: |
+          NAMESPACE="${{ inputs.namespace }}"
+          SERVICE_NAME="${{ inputs.service-name }}"
+          IMAGE_NAME="${{ inputs.image-name }}"
+          IMAGE_TAG="${{ inputs.image-tag }}"
+          
+          echo "Deploying $SERVICE_NAME to namespace: $NAMESPACE"
+          kubectl set image deployment/$SERVICE_NAME $IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-$IMAGE_NAME:$IMAGE_TAG -n $NAMESPACE
+          kubectl rollout status deployment/$SERVICE_NAME --timeout=5m -n $NAMESPACE

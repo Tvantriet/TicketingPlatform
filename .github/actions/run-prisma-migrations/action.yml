@@ -21,12 +21,52 @@ runs:
         NAMESPACE: ${{ inputs.namespace }}
       run: |
         echo "Running migrations for ${{ inputs.service-path }} in namespace: $NAMESPACE"
+        
+        # Ensure DATABASE_URL has sslmode=require and a decent timeout for Neon/Cloud DBs
+        if [[ $DATABASE_URL == postgresql://* ]] || [[ $DATABASE_URL == postgres://* ]]; then
+          if [[ $DATABASE_URL != *"sslmode="* ]]; then
+            if [[ $DATABASE_URL == *"?"* ]]; then
+              DATABASE_URL="${DATABASE_URL}&sslmode=require"
+            else
+              DATABASE_URL="${DATABASE_URL}?sslmode=require"
+            fi
+          fi
+          if [[ $DATABASE_URL != *"connect_timeout="* ]]; then
+            if [[ $DATABASE_URL == *"?"* ]]; then
+              DATABASE_URL="${DATABASE_URL}&connect_timeout=30"
+            else
+              DATABASE_URL="${DATABASE_URL}?connect_timeout=30"
+            fi
+          fi
+        fi
+
+        export DATABASE_URL
         npm ci
         
         # Disable exit on error to capture migration results
         set +e
-        DEPLOY_OUTPUT=$(npx prisma migrate deploy 2>&1)
-        EXIT_CODE=$?
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+          DEPLOY_OUTPUT=$(npx prisma migrate deploy 2>&1)
+          EXIT_CODE=$?
+          
+          if [ $EXIT_CODE -eq 0 ]; then
+            break
+          fi
+          
+          # If it's a connectivity error (P1001), wait and retry
+          if echo "$DEPLOY_OUTPUT" | grep -q "P1001"; then
+            echo "Connectivity error (P1001) detected. Database might be waking up..."
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              sleep 10
+              continue
+            fi
+          fi
+          break
+        done
         set -e
         
         echo "Prisma Deploy Output:"

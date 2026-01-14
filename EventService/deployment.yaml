@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: eventservice
-          image: event-service:placeholder
-          imagePullPolicy: Always
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3001
           resources:

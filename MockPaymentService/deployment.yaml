@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: mockpaymentservice
-          image: payment-service:placeholder
-          imagePullPolicy: Always
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3002
           resources:

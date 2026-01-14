@@ -242,7 +242,21 @@ jobs:
             echo "Rollout failed! Gathering debug info..."
             kubectl get pods -n $NAMESPACE -l app=frontend
             kubectl describe deployment frontend-deployment -n $NAMESPACE
-            kubectl logs -l app=frontend -n $NAMESPACE --tail=50
+            
+            # Get logs from any pod that isn't in ImagePullBackOff
+            PODS=$(kubectl get pods -n $NAMESPACE -l app=frontend -o name)
+            for POD in $PODS; do
+              echo "Checking logs for $POD..."
+              STATUS=$(kubectl get $POD -n $NAMESPACE -o jsonpath='{.status.containerStatuses[0].state}')
+              if echo "$STATUS" | grep -q "waiting"; then
+                REASON=$(kubectl get $POD -n $NAMESPACE -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}')
+                if [ "$REASON" = "ImagePullBackOff" ] || [ "$REASON" = "ErrImagePull" ]; then
+                  echo "Pod $POD is stuck pulling image, skipping logs."
+                  continue
+                fi
+              fi
+              kubectl logs $POD -n $NAMESPACE --tail=50 || echo "Could not get logs for $POD"
+            done
             exit 1
           fi
       

@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: gateway:placeholder
-          imagePullPolicy: Always
+#          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           resources:

@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
       - name: booking
-        image: booking-service:placeholder
-        imagePullPolicy: Always
+        image: nginx:alpine
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3003
         env:

@@ -171,43 +171,49 @@ jobs:
         if: inputs.event-service-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          kubectl set image deployment/eventservice eventservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-event:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/eventservice --timeout=5m -n $NAMESPACE
+          kubectl apply -f EventService/deployment.yaml -n $NAMESPACE
+          kubectl set image deployment/eventservice-deployment eventservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-event:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/eventservice-deployment --timeout=5m -n $NAMESPACE
       
       - name: Update BookingService
         if: inputs.booking-service-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          kubectl set image deployment/bookingservice bookingservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-booking:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/bookingservice --timeout=5m -n $NAMESPACE
+          kubectl apply -f BookingService/deployment.yaml -n $NAMESPACE
+          kubectl set image deployment/booking-deployment booking=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-booking:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/booking-deployment --timeout=5m -n $NAMESPACE
       
       - name: Update MockPaymentService
         if: inputs.payment-service-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          kubectl set image deployment/mockpaymentservice mockpaymentservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-payment:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/mockpaymentservice --timeout=5m -n $NAMESPACE
+          kubectl apply -f MockPaymentService/deployment.yaml -n $NAMESPACE
+          kubectl set image deployment/mockpaymentservice-deployment mockpaymentservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-payment:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/mockpaymentservice-deployment --timeout=5m -n $NAMESPACE
       
       - name: Update Frontend
         if: inputs.frontend-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          kubectl set image deployment/frontend frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/frontend --timeout=5m -n $NAMESPACE
+          kubectl apply -f Frontend/deployment.yaml -n $NAMESPACE
+          kubectl set image deployment/frontend-deployment frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/frontend-deployment --timeout=5m -n $NAMESPACE
       
       - name: Update Gateway
         if: inputs.gateway-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          kubectl set image deployment/gateway gateway=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-gateway:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/gateway --timeout=5m -n $NAMESPACE
+          kubectl apply -f Gateway/deployment.yaml -n $NAMESPACE
+          kubectl set image deployment/gateway-deployment gateway=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-gateway:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/gateway-deployment --timeout=5m -n $NAMESPACE
       
       - name: Update UserService
-        if: inputs.user-service-changed
+        if: inputs.user-service-changed && hashFiles('UserService/deployment.yaml') != ''
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          kubectl set image deployment/userservice userservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-user:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/userservice --timeout=5m -n $NAMESPACE
+          kubectl apply -f UserService/deployment.yaml -n $NAMESPACE
+          kubectl set image deployment/userservice-deployment userservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-user:${{ inputs.image-tag }} -n $NAMESPACE
+          kubectl rollout status deployment/userservice-deployment --timeout=5m -n $NAMESPACE
 
   integration-tests:
     needs: [determine-environment, deploy-k8s]

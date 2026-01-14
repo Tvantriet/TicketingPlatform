@@ -22,4 +22,28 @@ runs:
       run: |
         echo "Running migrations for ${{ inputs.service-path }} in namespace: $NAMESPACE"
         npm ci
-        npx prisma migrate deploy
+        
+        # Try to run migrations
+        DEPLOY_OUTPUT=$(npx prisma migrate deploy 2>&1)
+        EXIT_CODE=$?
+        echo "$DEPLOY_OUTPUT"
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          if echo "$DEPLOY_OUTPUT" | grep -q "P3005"; then
+            echo "Database not empty (P3005). Attempting to baseline..."
+            # Get the first migration name
+            FIRST_MIGRATION=$(ls -d prisma/migrations/*/ | head -n 1 | xargs -n 1 basename)
+            if [ -n "$FIRST_MIGRATION" ]; then
+              echo "Baseling with migration: $FIRST_MIGRATION"
+              npx prisma migrate resolve --applied "$FIRST_MIGRATION"
+              echo "Retrying deployment..."
+              npx prisma migrate deploy
+            else
+              echo "Could not find a migration to baseline."
+              exit 1
+            fi
+          else
+            echo "Migration failed with error other than P3005."
+            exit $EXIT_CODE
+          fi
+        fi

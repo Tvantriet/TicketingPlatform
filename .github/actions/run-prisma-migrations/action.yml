@@ -1,0 +1,65 @@
+name: 'Run Prisma Migrations'
+description: 'Run Prisma migrations for a service'
+inputs:
+  service-path:
+    description: 'Path to the service directory'
+    required: true
+  database-url:
+    description: 'Database connection URL'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Prisma migrations
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      env:
+        DATABASE_URL: ${{ inputs.database-url }}
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        echo "Running migrations for ${{ inputs.service-path }} in namespace: $NAMESPACE"
+        npm ci
+        
+        # Disable exit on error to capture migration results
+        set +e
+        DEPLOY_OUTPUT=$(npx prisma migrate deploy 2>&1)
+        EXIT_CODE=$?
+        set -e
+        
+        echo "Prisma Deploy Output:"
+        echo "$DEPLOY_OUTPUT"
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          if echo "$DEPLOY_OUTPUT" | grep -q "P3005"; then
+            echo "Database not empty (P3005). Attempting to baseline..."
+            
+            # Find the first migration directory
+            FIRST_MIGRATION_PATH=$(ls -d prisma/migrations/*/ 2>/dev/null | head -n 1)
+            if [ -z "$FIRST_MIGRATION_PATH" ]; then
+              echo "Error: No migrations found in prisma/migrations/"
+              exit 1
+            fi
+            
+            FIRST_MIGRATION=$(basename "$FIRST_MIGRATION_PATH")
+            echo "Baseling with migration: $FIRST_MIGRATION"
+            
+            npx prisma migrate resolve --applied "$FIRST_MIGRATION"
+            RESOLVE_EXIT_CODE=$?
+            
+            if [ $RESOLVE_EXIT_CODE -eq 0 ]; then
+              echo "Baseline successful. Retrying deployment..."
+              npx prisma migrate deploy
+            else
+              echo "Failed to resolve migration. Manual intervention may be required."
+              exit $RESOLVE_EXIT_CODE
+            fi
+          else
+            echo "Migration failed with error code $EXIT_CODE."
+            exit $EXIT_CODE
+          fi
+        else
+          echo "Migration completed successfully."
+        fi

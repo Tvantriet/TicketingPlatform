@@ -67,9 +67,26 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Debug - Show changed files
+        run: |
+          echo "=== Changed files in this push ==="
+          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "Comparing: ${{ github.event.before }}..${{ github.sha }}"
+            git diff --name-only ${{ github.event.before }} ${{ github.sha }} || echo "Could not compare commits"
+          else
+            echo "Comparing: HEAD~1..HEAD"
+            git diff --name-only HEAD~1 HEAD || echo "No previous commit to compare"
+          fi
+          echo ""
+          echo "=== Current branch ==="
+          echo "${{ github.ref }}"
+          echo "=== Commit SHA ==="
+          echo "${{ github.sha }}"
+      
       - uses: dorny/paths-filter@v3
         id: changes
         with:
+          base: ${{ github.event.before }}
           filters: |
             event-service:
               - 'EventService/**'
@@ -83,6 +100,16 @@ jobs:
               - 'UserService/**'
             frontend:
               - 'Frontend/**'
+      
+      - name: Debug - Show change detection results
+        run: |
+          echo "=== Change Detection Results ==="
+          echo "event-service: ${{ steps.changes.outputs.event-service }}"
+          echo "booking-service: ${{ steps.changes.outputs.booking-service }}"
+          echo "mock-payment-service: ${{ steps.changes.outputs.mock-payment-service }}"
+          echo "gateway: ${{ steps.changes.outputs.gateway }}"
+          echo "user-service: ${{ steps.changes.outputs.user-service }}"
+          echo "frontend: ${{ steps.changes.outputs.frontend }}"
 
   build-event:
     needs: detect-changes
@@ -189,7 +216,14 @@ jobs:
 
   deploy:
     needs: [detect-changes, build-event, build-booking, build-payment, build-gateway, build-user, build-frontend]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development'
+    if: |
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development') &&
+      (needs.build-event.result != 'failure') &&
+      (needs.build-booking.result != 'failure') &&
+      (needs.build-payment.result != 'failure') &&
+      (needs.build-gateway.result != 'failure') &&
+      (needs.build-user.result != 'failure') &&
+      (needs.build-frontend.result != 'failure')
     uses: ./.github/workflows/deploy.yml
     with:
       event-service-changed: ${{ needs.detect-changes.outputs.event-service == 'true' }}

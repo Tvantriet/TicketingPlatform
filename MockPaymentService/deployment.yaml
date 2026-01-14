@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: mockpaymentservice
-          image: mockpaymentservice:latest
-          imagePullPolicy: Never
+          image: payment-service:placeholder
+          imagePullPolicy: Always
           ports:
             - containerPort: 3002
           resources:

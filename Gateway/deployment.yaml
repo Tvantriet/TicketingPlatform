@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: gateway:latest
-          imagePullPolicy: Never
+          image: gateway:placeholder
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
           resources:

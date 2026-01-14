@@ -167,6 +167,15 @@ jobs:
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
           kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Create database secrets
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl create secret generic db-secrets \
+            --from-literal=EVENT_DB_URL="${{ secrets.EVENT_DB_URL }}" \
+            --from-literal=BOOKING_DB_URL="${{ secrets.BOOKING_DB_URL }}" \
+            --from-literal=USER_DB_URL="${{ secrets.USER_DB_URL }}" \
+            --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
+
       - name: Apply Infrastructure and Services
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"

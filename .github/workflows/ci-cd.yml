@@ -70,23 +70,21 @@ jobs:
       - name: Debug - Show changed files
         run: |
           echo "=== Changed files in this push ==="
-          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            echo "Comparing: ${{ github.event.before }}..${{ github.sha }}"
-            git diff --name-only ${{ github.event.before }} ${{ github.sha }} || echo "Could not compare commits"
-          else
-            echo "Comparing: HEAD~1..HEAD"
-            git diff --name-only HEAD~1 HEAD || echo "No previous commit to compare"
+          # Fallback logic: compare against before-sha if valid, else compare against main, else compare against HEAD~1
+          BASE_SHA="${{ github.event.before }}"
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA=$(git merge-base origin/main HEAD 2>/dev/null || echo "HEAD~1")
           fi
-          echo ""
-          echo "=== Current branch ==="
-          echo "${{ github.ref }}"
-          echo "=== Commit SHA ==="
-          echo "${{ github.sha }}"
+          
+          echo "Comparing: $BASE_SHA..${{ github.sha }}"
+          git diff --name-only $BASE_SHA ${{ github.sha }} || echo "No previous commit to compare"
+          
+          echo "BASE_SHA=$BASE_SHA" >> $GITHUB_ENV
       
       - uses: dorny/paths-filter@v3
         id: changes
         with:
-          base: ${{ github.event.before }}
+          base: ${{ env.BASE_SHA }}
           filters: |
             event-service:
               - 'EventService/**'

@@ -146,8 +146,8 @@ jobs:
       - name: Configure kubectl for EKS
         if: needs.determine-environment.outputs.use-eks == 'true'
         run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
-          kubectl config set-context --current --namespace=${{ needs.determine-environment.outputs.namespace }} || true
+          aws eks update-kubeconfig --name "${{ secrets.EKS_CLUSTER_NAME }}" --region "${{ secrets.AWS_REGION }}"
+          kubectl config set-context --current --namespace="${{ needs.determine-environment.outputs.namespace }}" || true
       
       - name: Configure kubectl (static config)
         if: needs.determine-environment.outputs.use-eks != 'true'
@@ -237,8 +237,8 @@ jobs:
       - name: Configure kubectl for EKS
         if: needs.determine-environment.outputs.use-eks == 'true'
         run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION || 'us-east-1' }}
-          kubectl config set-context --current --namespace=${{ needs.determine-environment.outputs.namespace }} || true
+          aws eks update-kubeconfig --name "${{ secrets.EKS_CLUSTER_NAME }}" --region "${{ secrets.AWS_REGION }}"
+          kubectl config set-context --current --namespace="${{ needs.determine-environment.outputs.namespace }}" || true
       
       - name: Configure kubectl (static config)
         if: needs.determine-environment.outputs.use-eks != 'true'

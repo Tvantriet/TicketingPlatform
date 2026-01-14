@@ -166,6 +166,12 @@ jobs:
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
           kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply Infrastructure and Services
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          kubectl apply -f k8s-infrastructure.yaml -n $NAMESPACE
+          kubectl apply -f k8s-services.yaml -n $NAMESPACE
       
       - name: Update EventService
         if: inputs.event-service-changed
@@ -208,12 +214,16 @@ jobs:
           kubectl rollout status deployment/gateway-deployment --timeout=5m -n $NAMESPACE
       
       - name: Update UserService
-        if: inputs.user-service-changed && hashFiles('UserService/deployment.yaml') != ''
+        if: inputs.user-service-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          kubectl apply -f UserService/deployment.yaml -n $NAMESPACE
-          kubectl set image deployment/userservice-deployment userservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-user:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/userservice-deployment --timeout=5m -n $NAMESPACE
+          if [ -f "UserService/deployment.yaml" ]; then
+            kubectl apply -f UserService/deployment.yaml -n $NAMESPACE
+            kubectl set image deployment/userservice-deployment userservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-user:${{ inputs.image-tag }} -n $NAMESPACE
+            kubectl rollout status deployment/userservice-deployment --timeout=5m -n $NAMESPACE
+          else
+            echo "UserService/deployment.yaml not found, skipping deployment update."
+          fi
 
   integration-tests:
     needs: [determine-environment, deploy-k8s]

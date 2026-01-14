@@ -186,41 +186,81 @@ jobs:
         if: inputs.event-service-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          IMAGE_PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
           kubectl apply -f EventService/deployment.yaml -n $NAMESPACE
-          kubectl set image deployment/eventservice-deployment eventservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-event:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/eventservice-deployment --timeout=5m -n $NAMESPACE
+          kubectl set image deployment/eventservice-deployment eventservice=${{ env.REGISTRY }}/$IMAGE_PREFIX-event:${{ inputs.image-tag }} -n $NAMESPACE
+          
+          if ! kubectl rollout status deployment/eventservice-deployment --timeout=2m -n $NAMESPACE; then
+            echo "Rollout failed! Gathering debug info..."
+            kubectl get pods -n $NAMESPACE -l app=eventservice
+            kubectl describe deployment eventservice-deployment -n $NAMESPACE
+            kubectl logs -l app=eventservice -n $NAMESPACE --tail=50
+            exit 1
+          fi
       
       - name: Update BookingService
         if: inputs.booking-service-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          IMAGE_PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
           kubectl apply -f BookingService/deployment.yaml -n $NAMESPACE
-          kubectl set image deployment/booking-deployment booking=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-booking:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/booking-deployment --timeout=5m -n $NAMESPACE
+          kubectl set image deployment/booking-deployment booking=${{ env.REGISTRY }}/$IMAGE_PREFIX-booking:${{ inputs.image-tag }} -n $NAMESPACE
+          
+          if ! kubectl rollout status deployment/booking-deployment --timeout=2m -n $NAMESPACE; then
+            echo "Rollout failed! Gathering debug info..."
+            kubectl get pods -n $NAMESPACE -l app=booking
+            kubectl describe deployment booking-deployment -n $NAMESPACE
+            kubectl logs -l app=booking -n $NAMESPACE --tail=50
+            exit 1
+          fi
       
       - name: Update MockPaymentService
         if: inputs.payment-service-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          IMAGE_PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
           kubectl apply -f MockPaymentService/deployment.yaml -n $NAMESPACE
-          kubectl set image deployment/mockpaymentservice-deployment mockpaymentservice=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-payment:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/mockpaymentservice-deployment --timeout=5m -n $NAMESPACE
+          kubectl set image deployment/mockpaymentservice-deployment mockpaymentservice=${{ env.REGISTRY }}/$IMAGE_PREFIX-payment:${{ inputs.image-tag }} -n $NAMESPACE
+          
+          if ! kubectl rollout status deployment/mockpaymentservice-deployment --timeout=2m -n $NAMESPACE; then
+            echo "Rollout failed! Gathering debug info..."
+            kubectl get pods -n $NAMESPACE -l app=mockpaymentservice
+            kubectl describe deployment mockpaymentservice-deployment -n $NAMESPACE
+            kubectl logs -l app=mockpaymentservice -n $NAMESPACE --tail=50
+            exit 1
+          fi
       
       - name: Update Frontend
         if: inputs.frontend-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          IMAGE_PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
           kubectl apply -f Frontend/deployment.yaml -n $NAMESPACE
-          kubectl set image deployment/frontend-deployment frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/frontend-deployment --timeout=5m -n $NAMESPACE
+          kubectl set image deployment/frontend-deployment frontend=${{ env.REGISTRY }}/$IMAGE_PREFIX-frontend:${{ inputs.image-tag }} -n $NAMESPACE
+          
+          if ! kubectl rollout status deployment/frontend-deployment --timeout=2m -n $NAMESPACE; then
+            echo "Rollout failed! Gathering debug info..."
+            kubectl get pods -n $NAMESPACE -l app=frontend
+            kubectl describe deployment frontend-deployment -n $NAMESPACE
+            kubectl logs -l app=frontend -n $NAMESPACE --tail=50
+            exit 1
+          fi
       
       - name: Update Gateway
         if: inputs.gateway-changed
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          IMAGE_PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
           kubectl apply -f Gateway/deployment.yaml -n $NAMESPACE
-          kubectl set image deployment/gateway-deployment gateway=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-gateway:${{ inputs.image-tag }} -n $NAMESPACE
-          kubectl rollout status deployment/gateway-deployment --timeout=5m -n $NAMESPACE
+          kubectl set image deployment/gateway-deployment gateway=${{ env.REGISTRY }}/$IMAGE_PREFIX-gateway:${{ inputs.image-tag }} -n $NAMESPACE
+          
+          if ! kubectl rollout status deployment/gateway-deployment --timeout=2m -n $NAMESPACE; then
+            echo "Rollout failed! Gathering debug info..."
+            kubectl get pods -n $NAMESPACE -l app=gateway
+            kubectl describe deployment gateway-deployment -n $NAMESPACE
+            kubectl logs -l app=gateway -n $NAMESPACE --tail=50
+            exit 1
+          fi
       
       - name: Update UserService
         if: inputs.user-service-changed

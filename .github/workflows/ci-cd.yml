@@ -70,21 +70,23 @@ jobs:
       - name: Debug - Show changed files
         run: |
           echo "=== Changed files in this push ==="
-          # Fallback logic: compare against before-sha if valid, else compare against main, else compare against HEAD~1
-          BASE_SHA="${{ github.event.before }}"
-          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            BASE_SHA=$(git merge-base origin/main HEAD 2>/dev/null || echo "HEAD~1")
+          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "Comparing: ${{ github.event.before }}..${{ github.sha }}"
+            git diff --name-only ${{ github.event.before }} ${{ github.sha }} || echo "Could not compare commits"
+          else
+            echo "Comparing: HEAD~1..HEAD"
+            git diff --name-only HEAD~1 HEAD || echo "No previous commit to compare"
           fi
-          
-          echo "Comparing: $BASE_SHA..${{ github.sha }}"
-          git diff --name-only $BASE_SHA ${{ github.sha }} || echo "No previous commit to compare"
-          
-          echo "BASE_SHA=$BASE_SHA" >> $GITHUB_ENV
+          echo ""
+          echo "=== Current branch ==="
+          echo "${{ github.ref }}"
+          echo "=== Commit SHA ==="
+          echo "${{ github.sha }}"
       
       - uses: dorny/paths-filter@v3
         id: changes
         with:
-          base: ${{ env.BASE_SHA }}
+          base: ${{ github.event.before }}
           filters: |
             event-service:
               - 'EventService/**'
@@ -111,7 +113,6 @@ jobs:
 
   build-event:
     needs: detect-changes
-    if: needs.detect-changes.outputs.event-service == 'true'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: EventService
@@ -123,7 +124,6 @@ jobs:
 
   build-booking:
     needs: detect-changes
-    if: needs.detect-changes.outputs.booking-service == 'true'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: BookingService
@@ -135,7 +135,6 @@ jobs:
 
   build-payment:
     needs: detect-changes
-    if: needs.detect-changes.outputs.mock-payment-service == 'true'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: MockPaymentService
@@ -147,7 +146,6 @@ jobs:
 
   build-gateway:
     needs: detect-changes
-    if: needs.detect-changes.outputs.gateway == 'true'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: Gateway
@@ -159,7 +157,6 @@ jobs:
 
   build-user:
     needs: detect-changes
-    if: needs.detect-changes.outputs.user-service == 'true'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: UserService
@@ -171,7 +168,6 @@ jobs:
 
   build-frontend:
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: Frontend
@@ -213,16 +209,22 @@ jobs:
           sarif_file: 'trivy-container-${{ matrix.image-name }}.sarif'
 
   deploy:
-    needs: [detect-changes]
+    needs: [detect-changes, build-event, build-booking, build-payment, build-gateway, build-user, build-frontend]
     if: |
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development') &&
+      (needs.build-event.result != 'failure') &&
+      (needs.build-booking.result != 'failure') &&
+      (needs.build-payment.result != 'failure') &&
+      (needs.build-gateway.result != 'failure') &&
+      (needs.build-user.result != 'failure') &&
+      (needs.build-frontend.result != 'failure')
     uses: ./.github/workflows/deploy.yml
     with:
-      event-service-changed: ${{ needs.detect-changes.outputs.event-service == 'true' }}
-      booking-service-changed: ${{ needs.detect-changes.outputs.booking-service == 'true' }}
-      payment-service-changed: ${{ needs.detect-changes.outputs.mock-payment-service == 'true' }}
-      frontend-changed: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-      gateway-changed: ${{ needs.detect-changes.outputs.gateway == 'true' }}
-      user-service-changed: ${{ needs.detect-changes.outputs.user-service == 'true' }}
+      event-service-changed: true
+      booking-service-changed: true
+      payment-service-changed: true
+      frontend-changed: true
+      gateway-changed: true
+      user-service-changed: true
       image-tag: ${{ github.sha }}
     secrets: inherit

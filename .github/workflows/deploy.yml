@@ -229,7 +229,23 @@ jobs:
             kubectl logs -l app=mockpaymentservice -n $NAMESPACE --tail=50
             exit 1
           fi
-      
+
+      - name: Update Gateway
+        if: inputs.gateway-changed
+        run: |
+          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
+          IMAGE_PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
+          kubectl apply -f Gateway/deployment.yaml -n $NAMESPACE
+          kubectl set image deployment/gateway-deployment gateway=${{ env.REGISTRY }}/$IMAGE_PREFIX-gateway:${{ inputs.image-tag }} -n $NAMESPACE
+          
+          if ! kubectl rollout status deployment/gateway-deployment --timeout=2m -n $NAMESPACE; then
+            echo "Rollout failed! Gathering debug info..."
+            kubectl get pods -n $NAMESPACE -l app=gateway
+            kubectl describe deployment gateway-deployment -n $NAMESPACE
+            kubectl logs -l app=gateway -n $NAMESPACE --tail=50
+            exit 1
+          fi
+          
       - name: Update Frontend
         if: inputs.frontend-changed
         run: |
@@ -257,22 +273,6 @@ jobs:
               fi
               kubectl logs $POD -n $NAMESPACE --tail=50 || echo "Could not get logs for $POD"
             done
-            exit 1
-          fi
-      
-      - name: Update Gateway
-        if: inputs.gateway-changed
-        run: |
-          NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
-          IMAGE_PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
-          kubectl apply -f Gateway/deployment.yaml -n $NAMESPACE
-          kubectl set image deployment/gateway-deployment gateway=${{ env.REGISTRY }}/$IMAGE_PREFIX-gateway:${{ inputs.image-tag }} -n $NAMESPACE
-          
-          if ! kubectl rollout status deployment/gateway-deployment --timeout=2m -n $NAMESPACE; then
-            echo "Rollout failed! Gathering debug info..."
-            kubectl get pods -n $NAMESPACE -l app=gateway
-            kubectl describe deployment gateway-deployment -n $NAMESPACE
-            kubectl logs -l app=gateway -n $NAMESPACE --tail=50
             exit 1
           fi
       

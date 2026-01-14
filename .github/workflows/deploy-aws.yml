@@ -1,0 +1,125 @@
+name: AWS EKS Deployment
+
+on:
+  push:
+    branches: [ main, development ]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: 
+          - name: eventservice
+            path: EventService
+          - name: bookingservice
+            path: BookingService
+          - name: userservice
+            path: UserService
+          - name: gateway
+            path: Gateway
+          - name: mockpaymentservice
+            path: MockPaymentService
+          - name: frontend
+            path: Frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Create repository if it doesn't exist (optional, but good for first run)
+          # aws ecr create-repository --repository-name ticketing-${{ matrix.service.name }} || true
+          
+          docker build -t $ECR_REGISTRY/ticketing-${{ matrix.service.name }}:$IMAGE_TAG \
+                       -t $ECR_REGISTRY/ticketing-${{ matrix.service.name }}:latest \
+                       ${{ matrix.service.path }}
+          docker push $ECR_REGISTRY/ticketing-${{ matrix.service.name }}:$IMAGE_TAG
+          docker push $ECR_REGISTRY/ticketing-${{ matrix.service.name }}:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy to EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          EVENT_DB_URL: ${{ secrets.EVENT_DB_URL }}
+          BOOKING_DB_URL: ${{ secrets.BOOKING_DB_URL }}
+          USER_DB_URL: ${{ secrets.USER_DB_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          # Create secrets if they don't exist
+          kubectl create secret generic db-secrets \
+            --from-literal=EVENT_DB_URL="$EVENT_DB_URL" \
+            --from-literal=BOOKING_DB_URL="$BOOKING_DB_URL" \
+            --from-literal=USER_DB_URL="$USER_DB_URL" \
+            --dry-run=client -o yaml | kubectl apply -f -
+            
+          kubectl create secret generic auth-secrets \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Apply base infrastructure (RabbitMQ etc)
+          kubectl apply -f k8s-infrastructure.yaml
+          kubectl apply -f k8s-services.yaml
+          
+          # Update and apply deployment manifests
+          for service_dir in EventService BookingService UserService Gateway MockPaymentService Frontend; do
+            if [ -f "$service_dir/deployment.yaml" ]; then
+              SERVICE_NAME=$(echo $service_dir | tr '[:upper:]' '[:lower:]')
+              IMAGE_URL="$ECR_REGISTRY/ticketing-$SERVICE_NAME:$IMAGE_TAG"
+              
+              echo "Deploying $SERVICE_NAME with image $IMAGE_URL"
+              
+              # Update the image in the manifest
+              sed -i "s|image: nginx:alpine|image: $IMAGE_URL|g" "$service_dir/deployment.yaml"
+              
+              kubectl apply -f "$service_dir/deployment.yaml"
+            fi
+          done
+
+      - name: Verify Deployment
+        run: |
+          kubectl rollout status deployment/eventservice-deployment
+          kubectl rollout status deployment/booking-deployment
+          kubectl rollout status deployment/userservice-deployment
+          kubectl rollout status deployment/gateway-deployment
+          kubectl rollout status deployment/mockpaymentservice-deployment
+          kubectl rollout status deployment/frontend-deployment

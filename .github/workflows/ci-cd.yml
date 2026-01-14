@@ -215,15 +215,9 @@ jobs:
           sarif_file: 'trivy-container-${{ matrix.image-name }}.sarif'
 
   deploy:
-    needs: [detect-changes, build-event, build-booking, build-payment, build-gateway, build-user, build-frontend]
+    needs: [detect-changes]
     if: |
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development') &&
-      (needs.build-event.result != 'failure') &&
-      (needs.build-booking.result != 'failure') &&
-      (needs.build-payment.result != 'failure') &&
-      (needs.build-gateway.result != 'failure') &&
-      (needs.build-user.result != 'failure') &&
-      (needs.build-frontend.result != 'failure')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' || github.ref == 'refs/heads/development')
     uses: ./.github/workflows/deploy.yml
     with:
       event-service-changed: ${{ needs.detect-changes.outputs.event-service == 'true' }}

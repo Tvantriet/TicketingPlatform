@@ -32,7 +32,15 @@ on:
         type: string
     secrets:
       KUBECONFIG:
-        required: true
+        required: false
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      AWS_REGION:
+        required: false
+      EKS_CLUSTER_NAME:
+        required: false
       EVENT_DB_URL:
         required: false
       BOOKING_DB_URL:
@@ -54,6 +62,7 @@ jobs:
     outputs:
       namespace: ${{ steps.env.outputs.namespace }}
       environment: ${{ steps.env.outputs.environment }}
+      use-eks: ${{ steps.env.outputs.use-eks }}
     steps:
       - name: Determine environment from branch
         id: env
@@ -62,17 +71,22 @@ jobs:
           if [ "$BRANCH_NAME" = "main" ]; then
             echo "namespace=ticketing-prod" >> $GITHUB_OUTPUT
             echo "environment=production" >> $GITHUB_OUTPUT
+            echo "use-eks=false" >> $GITHUB_OUTPUT
           elif [ "$BRANCH_NAME" = "release" ]; then
             echo "namespace=ticketing-staging" >> $GITHUB_OUTPUT
             echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "use-eks=false" >> $GITHUB_OUTPUT
           elif [ "$BRANCH_NAME" = "development" ]; then
             echo "namespace=ticketing-dev" >> $GITHUB_OUTPUT
             echo "environment=development" >> $GITHUB_OUTPUT
+            echo "use-eks=true" >> $GITHUB_OUTPUT
           else
             echo "namespace=ticketing-dev" >> $GITHUB_OUTPUT
             echo "environment=development" >> $GITHUB_OUTPUT
+            echo "use-eks=false" >> $GITHUB_OUTPUT
           fi
           echo "Deploying to namespace: $(cat $GITHUB_OUTPUT | grep namespace | cut -d'=' -f2)"
+          echo "Using EKS: $(cat $GITHUB_OUTPUT | grep use-eks | cut -d'=' -f2)"
   
   prisma-migrations:
     needs: determine-environment
@@ -121,12 +135,28 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
       
-      - name: Configure kubectl
+      - name: Configure kubectl for EKS
+        if: needs.determine-environment.outputs.use-eks == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      
+      - name: Configure kubectl for EKS
+        if: needs.determine-environment.outputs.use-eks == 'true'
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION || 'us-east-1' }}
+          kubectl config set-context --current --namespace=${{ needs.determine-environment.outputs.namespace }} || true
+      
+      - name: Configure kubectl (static config)
+        if: needs.determine-environment.outputs.use-eks != 'true'
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
       
       - name: Set namespace context
+        if: needs.determine-environment.outputs.use-eks != 'true'
         run: |
           NAMESPACE="${{ needs.determine-environment.outputs.namespace }}"
           echo "Deploying to namespace: $NAMESPACE"
@@ -196,7 +226,22 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
       
-      - name: Configure kubectl
+      - name: Configure kubectl for EKS
+        if: needs.determine-environment.outputs.use-eks == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      
+      - name: Configure kubectl for EKS
+        if: needs.determine-environment.outputs.use-eks == 'true'
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION || 'us-east-1' }}
+          kubectl config set-context --current --namespace=${{ needs.determine-environment.outputs.namespace }} || true
+      
+      - name: Configure kubectl (static config)
+        if: needs.determine-environment.outputs.use-eks != 'true'
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config

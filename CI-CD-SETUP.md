@@ -9,9 +9,16 @@ Go to: `Settings > Secrets and variables > Actions > New repository secret`
 Add the following secrets:
 
 ```
-# Kubernetes
+# Kubernetes (for non-EKS clusters)
 KUBECONFIG                 # Base64 encoded kubeconfig file
                           # Generate: cat ~/.kube/config | base64 -w 0
+                          # Or on Windows: [Convert]::ToBase64String([System.IO.File]::ReadAllBytes("$env:USERPROFILE\.kube\config"))
+
+# AWS EKS (for test environment on EKS)
+AWS_ACCESS_KEY_ID         # AWS access key with EKS permissions
+AWS_SECRET_ACCESS_KEY     # AWS secret access key
+AWS_REGION                # AWS region (e.g., us-east-1)
+EKS_CLUSTER_NAME          # Name of your EKS cluster
 
 # Database URLs (Production)
 EVENT_DB_URL              # postgres://user:pass@host:5432/events
@@ -24,12 +31,15 @@ DOCKER_REGISTRY_TOKEN     # Docker registry token
 
 ## Pipeline Workflow
 
-1. **Trigger**: Push to `main`/`develop` or PR
+1. **Trigger**: Push to `main`/`release`/`development` branches
 2. **Change Detection**: Only builds/tests affected services
 3. **Build & Test**: Each service independently
 4. **Docker Build**: Only on push (not PRs)
 5. **Push Images**: To GitHub Container Registry (ghcr.io)
-6. **Deploy**: Only on `main` branch push
+6. **Deploy**: 
+   - `main` → production (ticketing-prod namespace) - uses static kubeconfig
+   - `release` → staging (ticketing-staging namespace) - uses static kubeconfig
+   - `development` → dev on AWS EKS (ticketing-dev namespace) - uses AWS credentials
 7. **Migrations**: Run after successful deploy
 
 ### Service Dependencies
@@ -244,25 +254,79 @@ security-scan:
 
 ## Multi-Environment Setup
 
-### Environments: Dev, Staging, Production
+### Environments: Dev (EKS), Staging, Production
 
-```yaml
-deploy-staging:
-  if: github.ref == 'refs/heads/develop'
-  environment:
-    name: staging
-    url: https://staging.yourapp.com
-  steps:
-    # Deploy to staging cluster
+The workflow automatically determines the environment based on branch:
+- `main` → production (ticketing-prod namespace) - uses static kubeconfig
+- `release` → staging (ticketing-staging namespace) - uses static kubeconfig
+- `development` → dev on AWS EKS (ticketing-dev namespace) - uses AWS credentials
 
-deploy-production:
-  if: github.ref == 'refs/heads/main'
-  environment:
-    name: production
-    url: https://yourapp.com
-  steps:
-    # Deploy to production cluster
-```
+### AWS EKS Setup for Development Environment
+
+1. **Create EKS Cluster** (if not already done):
+   ```bash
+   aws eks create-cluster --name your-cluster-name --region us-east-1 \
+     --role-arn arn:aws:iam::ACCOUNT_ID:role/EKSClusterRole \
+     --resources-vpc-config subnetIds=subnet-xxx,subnet-yyy,securityGroupIds=sg-xxx
+   ```
+
+2. **Create IAM User/Role for GitHub Actions**:
+   - Create IAM user or use existing one
+   - Attach policy: `arn:aws:iam::aws:policy/AmazonEKSClusterPolicy`
+   - Create access keys and add to GitHub secrets
+
+3. **Configure GitHub Secrets**:
+   ```
+   AWS_ACCESS_KEY_ID=your-access-key
+   AWS_SECRET_ACCESS_KEY=your-secret-key
+   AWS_REGION=us-east-1
+   EKS_CLUSTER_NAME=your-cluster-name
+   ```
+
+4. **Deploy to Development Environment**:
+   ```bash
+   git checkout development
+   git push origin development
+   ```
+   The workflow will automatically:
+   - Authenticate with AWS
+   - Configure kubectl for EKS
+   - Deploy to `ticketing-dev` namespace
+
+5. **Verify Deployment**:
+   ```bash
+   aws eks update-kubeconfig --name your-cluster-name --region us-east-1
+   kubectl get pods -n ticketing-dev
+   kubectl get svc -n ticketing-dev
+   ```
+
+### Static Kubeconfig Setup (for non-EKS clusters)
+
+For local k3d, GKE, AKS, or other Kubernetes clusters:
+
+1. **Get kubeconfig**:
+   ```bash
+   # For k3d
+   kubectl config view --raw > kubeconfig.yaml
+   
+   # For GKE
+   gcloud container clusters get-credentials CLUSTER_NAME --region REGION
+   kubectl config view --raw > kubeconfig.yaml
+   ```
+
+2. **Base64 encode**:
+   ```bash
+   # Linux/Mac
+   cat kubeconfig.yaml | base64 -w 0
+   
+   # Windows PowerShell
+   [Convert]::ToBase64String([System.IO.File]::ReadAllBytes("kubeconfig.yaml"))
+   ```
+
+3. **Add to GitHub Secrets**:
+   ```
+   KUBECONFIG=<base64-encoded-content>
+   ```
 
 ## Next Steps
 

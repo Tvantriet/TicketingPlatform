@@ -11,12 +11,12 @@ import { authorize } from '../middleware/authorize.js';
 
 const router = express.Router();
 
-// Admin-only routes
-router.post('/', authorize('admin'), upload.single('image'), createEvent);
-router.put('/:id', authorize('admin'), upload.single('image'), updateEvent);
-router.delete('/:id', authorize('admin'), deleteEvent);
+// Organizer or Admin only routes
+router.post('/', authorize('organizer', 'admin'), upload.single('image'), createEvent);
+router.put('/:id', authorize('organizer', 'admin'), upload.single('image'), updateEvent);
+router.delete('/:id', authorize('organizer', 'admin'), deleteEvent);
 
-// Public routes (no auth required)
+// Public routes 
 router.get('/', getAllEvents);
 router.get('/:id', getEvent);
 

@@ -1,19 +1,26 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import * as eventService from '../../src/services/eventService.js';
-import prisma from '../../src/db/prisma.js';
 
-// Mock Prisma
+// Define mocks BEFORE jest.mock
+const mockCreate = jest.fn<any>();
+const mockFindMany = jest.fn<any>();
+const mockFindUnique = jest.fn<any>();
+const mockUpdate = jest.fn<any>();
+const mockDelete = jest.fn<any>();
+
 jest.mock('../../src/db/prisma.js', () => ({
   default: {
     event: {
-      create: jest.fn<any>(),
-      findMany: jest.fn<any>(),
-      findUnique: jest.fn<any>(),
-      update: jest.fn<any>(),
-      delete: jest.fn<any>()
+      create: mockCreate,
+      findMany: mockFindMany,
+      findUnique: mockFindUnique,
+      update: mockUpdate,
+      delete: mockDelete,
     },
   },
 }));
+
+import * as eventService from '../../src/services/eventService.js';
+import prisma from '../../src/db/prisma.js';
 
 describe('EventService Unit Tests', () => {
   beforeEach(() => {
@@ -35,7 +42,7 @@ describe('EventService Unit Tests', () => {
         updatedAt: new Date(),
       };
 
-      (prisma.event.create as jest.Mock<any>).mockResolvedValue(mockEvent);
+      mockCreate.mockResolvedValue(mockEvent);
 
       const result = await eventService.createEvent({
         name: 'Test Event',

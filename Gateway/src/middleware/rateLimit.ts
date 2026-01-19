@@ -9,8 +9,7 @@ interface RateLimitRequest extends Request {
 }
 
 /**
- * Strict rate limiter for authentication endpoints
- * Prevents brute force attacks on login/register
+ * Stricter rate limiter for authentication endpoints
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -31,8 +30,7 @@ export const authRateLimiter = rateLimit({
 });
 
 /**
- * General API rate limiter for protected routes
- * Per-user rate limiting when authenticated
+ * Rate limiter for the general endpoints
  */
 export const apiRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
@@ -53,28 +51,6 @@ export const apiRateLimiter = rateLimit({
       error: 'Too many requests',
       message: 'Please slow down',
       retryAfter: Math.ceil(req.rateLimit?.resetTime ? (req.rateLimit.resetTime - Date.now()) / 1000 : 60)
-    });
-  }
-});
-
-/**
- * Strict rate limiter for public endpoints
- * Prevents abuse of public routes
- */
-export const publicRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 requests per 15 minutes
-  message: {
-    error: 'Too many requests',
-    message: 'Please try again later'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req: RateLimitRequest, res: Response) => {
-    res.status(429).json({
-      error: 'Too many requests',
-      message: 'Please try again later',
-      retryAfter: Math.ceil(req.rateLimit?.resetTime ? (req.rateLimit.resetTime - Date.now()) / 1000 : 900)
     });
   }
 });

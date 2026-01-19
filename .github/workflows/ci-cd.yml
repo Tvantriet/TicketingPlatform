@@ -195,7 +195,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Trivy vulnerability scanner in container mode
-        continue-on-error: true
+        continue-on-error: false
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ghcr.io/${{ env.IMAGE_PREFIX }}-${{ matrix.image-name }}:latest

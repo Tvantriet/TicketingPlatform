@@ -30,23 +30,15 @@ export interface AuthResult {
   error?: string;
 }
 
-/**
- * Hash a password with bcrypt
- */
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-/**
- * Compare password with hash
- */
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
 
-/**
- * Generate JWT token for authenticated user
- */
 export function generateToken(userId: number, userName: string): string {
   return jwt.sign(
     { userId, userName },
@@ -55,9 +47,6 @@ export function generateToken(userId: number, userName: string): string {
   );
 }
 
-/**
- * Verify JWT token
- */
 export function verifyToken(token: string): { userId: number; userName: string } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: number; userName: string };

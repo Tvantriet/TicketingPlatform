@@ -13,10 +13,10 @@ export let options = {
       startVUs: 1,
       stages: [
         { duration: '10s', target: 50 },   
-        { duration: '30s', target: 250 },    
-        { duration: '1m', target: 500 },   
-        { duration: '20s', target: 80 },    
-        { duration: '10s', target: 0 },    
+        { duration: '10s', target: 250 },    
+        { duration: '30s', target: 400 },   
+        { duration: '30s', target: 30 },    
+        { duration: '1m', target: 0 },    
       ],
       gracefulRampDown: '30s',
       exec: 'bookingScenario',
@@ -27,16 +27,16 @@ export let options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '10s', target: 0 },     // Wait for booking test to start
-        { duration: '20s', target: 80 },    // Sudden spike
-        { duration: '2m', target: 80 },     // Hold spike
-        { duration: '30s', target: 0 },     // Drop off
+        { duration: '10s', target: 0 },
+        { duration: '20s', target: 80 },   
+        { duration: '2m', target: 80 },     
+        { duration: '30s', target: 0 },    
       ],
       gracefulRampDown: '20s',
       exec: 'eventScenario',
     },
   },
-  // thresholds die gehaald moeten worden voor toekmostige automatische testing
+  // Thresholds die gehaald moeten worden voor toekmostige automatische testing
   thresholds: {
     http_req_duration: ['p(95)<500'], 
     http_req_failed: ['rate<0.1'],    
@@ -44,39 +44,35 @@ export let options = {
 };
 
 // Scenario 1: booking service only simple endpoints to test
-export function bookingScenario() {
-  let healthRes = http.get(`${BOOKING_SERVICE}/health`);
-  check(healthRes, {
-    'booking health check is 200': (r) => r.status === 200,
-  });
-  
+export function bookingScenario() {  
   let bookingRes = http.get(`${BOOKING_SERVICE}/api/bookings`);
   check(bookingRes, {
     'booking list retrieved': (r) => r.status === 200 || r.status === 404,
+  });
+
+  // reserve ticket
+  let reserveRes = http.post(`${BOOKING_SERVICE}/api/bookings/1/reserve`);
+  check(reserveRes, {
+    'ticket reserved': (r) => r.status === 200,
   });
   
   sleep(0.5); // Think time to simulate user
 }
 
 // Scenario 2: Event queries ook testing placeholder (meer intensief)
-export function eventScenario() {
-  // Health check
-  let healthRes = http.get(`${EVENT_SERVICE}/health`);
-  check(healthRes, {
-    'event health check is 200': (r) => r.status === 200,
-  });
-  
+export function eventScenario() {  
   // Query events
   let eventsRes = http.get(`${EVENT_SERVICE}/api/events`);
   check(eventsRes, {
     'events retrieved': (r) => r.status === 200,
   });
-  
-  // Query tickets
-  let ticketsRes = http.get(`${EVENT_SERVICE}/api/tickets`);
-  check(ticketsRes, {
-    'tickets retrieved': (r) => r.status === 200 || r.status === 404,
+
+  // get event by id
+  let eventRes = http.get(`${EVENT_SERVICE}/api/events/1`);
+  check(eventRes, {
+    'event retrieved': (r) => r.status === 200,
   });
+  
   
   sleep(0.3); // Think time to simulate user
 }

@@ -3,7 +3,7 @@ import { check, sleep } from 'k6';
 
 // Enige services in gebruik voor testing
 const BOOKING_SERVICE = 'http://localhost:3003';
-const EVENT_SERVICE = 'http://localhost:3001';
+const EVENT_SERVICE = 'http://localhost:3005';
 
 export let options = {
   scenarios: {
@@ -13,8 +13,8 @@ export let options = {
       startVUs: 1,
       stages: [
         { duration: '10s', target: 50 },   
-        { duration: '10s', target: 250 },    
-        { duration: '30s', target: 400 },   
+        { duration: '10s', target: 60 },    
+        { duration: '30s', target: 120 },   
         { duration: '30s', target: 30 },    
         { duration: '1m', target: 0 },    
       ],

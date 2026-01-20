@@ -2,9 +2,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 
-// Gateway URL - all requests go through the gateway
-const GATEWAY = 'http://localhost:3000';
-const API_BASE = `${GATEWAY}/api`;
+const API_BASE = `http://localhost:3000/api`;
 
 // SharedArray ensures data is loaded once and shared across all VUs
 // Fetches real event and ticket data from database via API through gateway
@@ -46,7 +44,7 @@ const testData = new SharedArray('testData', function () {
     ? { 'Authorization': `Bearer ${authToken}` }
     : {};
   
-  // Fetch all events through gateway (requires auth)
+  // Get events through gateway
   const eventsRes = http.get(`${API_BASE}/events`, { headers: authHeaders });
   let events = [];
   if (eventsRes.status === 200) {
@@ -54,7 +52,7 @@ const testData = new SharedArray('testData', function () {
     console.log(`Found ${events.length} events`);
   }
   
-  // Fetch available tickets for events through gateway
+  // Get available tickets for events through gateway
   let tickets = [];
   for (const event of events.slice(0, 10)) { // Limit to first 10 events
     const ticketsRes = http.get(`${API_BASE}/tickets/event/${event.id}`, { headers: authHeaders });

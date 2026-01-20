@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { register, login } from '../service/authService.js';
 import * as userService from '../service/userService.js';
+import * as gdprService from '../service/gdprService.js';
 import { registerSchema, loginSchema, updateUserSchema } from '../utils/validation.js';
 
 /**
@@ -167,6 +168,28 @@ export async function getUserAuditLogs(req: Request, res: Response) {
     const logs = await userService.getUserAuditLogs(userId, limit);
     return res.json(logs);
   } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * GDPR: Request account deletion (Right to be Forgotten)
+ */
+export async function requestAccountDeletion(req: Request, res: Response) {
+  try {
+    const userId = (req as any).userId;
+    const result = await gdprService.deleteUserData(userId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    return res.json({
+      message: 'Account deletion completed',
+      deletedData: result.deletedData
+    });
+  } catch (error) {
+    console.error('Error during account deletion:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

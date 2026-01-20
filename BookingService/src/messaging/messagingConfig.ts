@@ -5,6 +5,7 @@ export const RABBITMQ_CONFIG = {
 export const EXCHANGES = {
     PAYMENTS: 'payments',
     TICKETS: 'tickets',
+    USERS: 'users',
 };
 
 export const ROUTING_KEYS = {
@@ -13,10 +14,12 @@ export const ROUTING_KEYS = {
     PAYMENT_FAILED: 'payment.failed',
     TICKET_RESERVE: 'ticket.reserve',
     TICKET_RELEASE: 'ticket.release',
+    USER_DELETION_REQUEST: 'user.deletion.request',
 };
     
 export const QUEUES = {
     PAYMENT_COMPLETED: 'booking-payment-completed',
     PAYMENT_FAILED: 'booking-payment-failed',
+    USER_DELETION_REQUESTS: 'booking-user-deletion-requests',
 };
 

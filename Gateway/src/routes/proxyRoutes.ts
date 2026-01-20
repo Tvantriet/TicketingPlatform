@@ -10,11 +10,13 @@
   // Public routes (no auth required) - strict rate limiting for auth endpoints
   router.post('/users/register', authRateLimiter, createProxyMiddleware({
     target: SERVICE_URLS.USER_SERVICE,
+    pathRewrite: { '^/users': '/api/users' },
     ...createProxyOptions(false)
   }));
 
   router.post('/users/login', authRateLimiter, createProxyMiddleware({
     target: SERVICE_URLS.USER_SERVICE,
+    pathRewrite: { '^/users': '/api/users' },
     ...createProxyOptions(false)
   }));
 
@@ -41,6 +43,7 @@
 
   router.use('/users', apiRateLimiter, verifyToken, createProxyMiddleware({
     target: SERVICE_URLS.USER_SERVICE,
+    pathRewrite: { '^/users': '/api/users' },
     ...createProxyOptions(true)
   }));
 

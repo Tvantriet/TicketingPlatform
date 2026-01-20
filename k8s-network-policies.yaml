@@ -1,0 +1,236 @@
+# SERVICE COMMUNICATION MATRIX:
+# ==============================
+# 
+# INGRESS (Who can talk TO this service):
+# ----------------------------------------
+# gateway:
+#   - External (any namespace) → gateway:3000
+#
+# eventservice:
+#   - gateway → eventservice:3001
+#
+# booking:
+#   - gateway → booking:3003
+#
+# rabbitmq:
+#   - eventservice → rabbitmq:5672
+#   - booking → rabbitmq:5672
+#   - mockpaymentservice → rabbitmq:5672
+#
+# mockpaymentservice:
+#   - gateway → mockpaymentservice:3002
+#
+# userservice:
+#   - gateway → userservice:3004
+#
+# EGRESS (Who this service can talk TO):
+# ---------------------------------------
+# gateway:
+#   - gateway → eventservice:3001
+#   - gateway → booking:3003
+#   - gateway → mockpaymentservice:3002
+#   - gateway → userservice:3004
+#
+# eventservice:
+#   - eventservice → rabbitmq:5672
+#   - eventservice → database:5432
+#
+# booking:
+#   - booking → eventservice:3001
+#   - booking → rabbitmq:5672
+#   - booking → database:5432
+#
+# rabbitmq:
+#   - rabbitmq → eventservice:* (return traffic on established connections)
+#   - rabbitmq → booking:* (return traffic on established connections)
+#   - rabbitmq → mockpaymentservice:* (return traffic on established connections)
+#
+# mockpaymentservice:
+#   - (No explicit egress policy defined - blocked by deny-all)
+#
+# userservice:
+#   - (No explicit egress policy defined - blocked by deny-all)
+#
+# ==============================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# Gateway kan alleen binnenkomend verkeer ontvangen
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: eventservice
+    ports:
+    - protocol: TCP
+      port: 3001
+  - to:
+    - podSelector:
+        matchLabels:
+          app: booking
+    ports:
+    - protocol: TCP
+      port: 3003
+  - to:
+    - podSelector:
+        matchLabels:
+          app: mockpaymentservice
+    ports:
+    - protocol: TCP
+      port: 3002
+  - to:
+    - podSelector:
+        matchLabels:
+          app: userservice
+    ports:
+    - protocol: TCP
+      port: 3004
+---
+# EventService kan alleen verkeer van Gateway ontvangen
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eventservice-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: eventservice
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: gateway
+    ports:
+    - protocol: TCP
+      port: 3001
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: rabbitmq
+    ports:
+    - protocol: TCP
+      port: 5672
+  # Database toegang (als database in cluster zit)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# BookingService kan alleen verkeer van Gateway ontvangen
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: booking-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: booking
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: gateway
+    ports:
+    - protocol: TCP
+      port: 3003
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: eventservice
+    ports:
+    - protocol: TCP
+      port: 3001
+  - to:
+    - podSelector:
+        matchLabels:
+          app: rabbitmq
+    ports:
+    - protocol: TCP
+      port: 5672
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# RabbitMQ alleen toegankelijk voor services die het nodig hebben
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: eventservice
+    ports:
+    - protocol: TCP
+      port: 5672
+  - from:
+    - podSelector:
+        matchLabels:
+          app: booking
+    ports:
+    - protocol: TCP
+      port: 5672
+  - from:
+    - podSelector:
+        matchLabels:
+          app: mockpaymentservice
+    ports:
+    - protocol: TCP
+      port: 5672
+  egress:
+  # Allow responses back to services that connect to RabbitMQ
+  # Return traffic uses ephemeral ports, so we allow all ports to these services
+  - to:
+    - podSelector:
+        matchLabels:
+          app: eventservice
+  - to:
+    - podSelector:
+        matchLabels:
+          app: booking
+  - to:
+    - podSelector:
+        matchLabels:
+          app: mockpaymentservice

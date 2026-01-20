@@ -1,23 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mockpaymentservice-deployment
+  name: userservice-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mockpaymentservice
+      app: userservice
   template:
     metadata:
       labels:
-        app: mockpaymentservice
+        app: userservice
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3004"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
-        - name: mockpaymentservice
-          image: nginx:alpine
+        - name: userservice
+          image: userservice:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 3002
+            - containerPort: 3004
           resources:
             requests:
               cpu: "100m"
@@ -26,23 +30,29 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           env:
-            - name: RABBITMQ_URL
+            - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: rabbitmq-secrets
-                  key: RABBITMQ_URL
+                  name: db-secrets
+                  key: USER_DB_URL
             - name: PORT
-              value: "3002"
+              value: "3004"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: JWT_SECRET
+                  optional: true
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: mockpaymentservice-hpa
+  name: userservice-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: mockpaymentservice-deployment
+    name: userservice-deployment
   minReplicas: 1
   maxReplicas: 5
   metrics:

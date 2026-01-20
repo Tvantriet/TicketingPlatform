@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import prisma from '../db/prisma.js';
 import { logLoginFailure } from './auditLogService.js';
+import { loginAttempts, loginFailures, registrationAttempts } from '../utils/metrics.js';
 
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
@@ -72,6 +73,7 @@ export async function register(data: RegisterData): Promise<AuthResult> {
     });
 
     if (existingUser) {
+      registrationAttempts.labels('failure').inc();
       return {
         success: false,
         error: existingUser.userName === data.userName
@@ -96,6 +98,8 @@ export async function register(data: RegisterData): Promise<AuthResult> {
     // Generate token
     const token = generateToken(user.id, user.userName);
 
+    registrationAttempts.labels('success').inc();
+    
     return {
       success: true,
       token,
@@ -106,6 +110,7 @@ export async function register(data: RegisterData): Promise<AuthResult> {
       }
     };
   } catch (error) {
+    registrationAttempts.labels('failure').inc();
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Registration failed'
@@ -151,6 +156,10 @@ export async function login(
         userAgent
       });
 
+      // Track metrics
+      loginAttempts.labels('failure').inc();
+      loginFailures.labels('user_not_found').inc();
+
       return {
         success: false,
         error: 'Invalid credentials'
@@ -171,6 +180,10 @@ export async function login(
         userAgent
       });
 
+      // Track metrics
+      loginAttempts.labels('failure').inc();
+      loginFailures.labels('invalid_password').inc();
+
       return {
         success: false,
         error: 'Invalid credentials'
@@ -179,6 +192,9 @@ export async function login(
 
     // Generate token
     const token = generateToken(user.id, user.userName);
+
+    // Track successful login
+    loginAttempts.labels('success').inc();
 
     return {
       success: true,
@@ -190,6 +206,8 @@ export async function login(
       }
     };
   } catch (error) {
+    loginAttempts.labels('failure').inc();
+    loginFailures.labels('error').inc();
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Login failed'

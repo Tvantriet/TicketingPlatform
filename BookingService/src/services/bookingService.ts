@@ -169,3 +169,20 @@ export const getPendingExpiredBookings = async (): Promise<Booking[]> => {
   });
 };
 
+/**
+ * GDPR: Anonymize all bookings for a user
+ * Replaces userId with "DELETED_USER" and clears payment details
+ */
+export const anonymizeUserBookings = async (userId: string): Promise<number> => {
+  const result = await prisma.booking.updateMany({
+    where: { userId },
+    data: {
+      userId: 'DELETED_USER',
+      paymentDetails: null, // Remove payment PII
+    },
+  });
+
+  console.log(`Anonymized ${result.count} bookings for user ${userId}`);
+  return result.count;
+};
+

@@ -6,7 +6,8 @@ import {
   getUserById,
   getUsers,
   updateUser,
-  getUserAuditLogs
+  getUserAuditLogs,
+  requestAccountDeletion
 } from '../controllers/userController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -22,5 +23,8 @@ router.put('/me', authenticateToken, updateUser);
 router.get('/:id', authenticateToken, getUserById);
 router.get('/', authenticateToken, getUsers);
 router.get('/:id/audit-logs', authenticateToken, getUserAuditLogs);
+
+// GDPR route
+router.delete('/me/gdpr', authenticateToken, requestAccountDeletion);
 
 export default router;

@@ -1,0 +1,449 @@
+{
+  "title": "All Services Monitoring",
+  "uid": "all-services-monitoring",
+  "tags": ["kubernetes", "monitoring"],
+  "timezone": "browser",
+  "schemaVersion": 27,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "type": "timeseries",
+      "title": "CPU Usage - All Services",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"default\",pod=~\"booking-.*\",container!=\"POD\",container!=\"\"}[5m])) by (pod)",
+          "legendFormat": "BookingService - {{pod}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"default\",pod=~\"eventservice-.*\",container!=\"POD\",container!=\"\"}[5m])) by (pod)",
+          "legendFormat": "EventService - {{pod}}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"default\",pod=~\"gateway-.*\",container!=\"POD\",container!=\"\"}[5m])) by (pod)",
+          "legendFormat": "Gateway - {{pod}}",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"default\",pod=~\"userservice-.*\",container!=\"POD\",container!=\"\"}[5m])) by (pod)",
+          "legendFormat": "UserService - {{pod}}",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"default\",pod=~\"mockpaymentservice-.*\",container!=\"POD\",container!=\"\"}[5m])) by (pod)",
+          "legendFormat": "MockPaymentService - {{pod}}",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "CPU Cores",
+            "axisPlacement": "auto",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "short"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "type": "timeseries",
+      "title": "Memory Usage - All Services",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(container_memory_usage_bytes{namespace=\"default\",pod=~\"booking-.*\",container!=\"POD\",container!=\"\"}) by (pod)",
+          "legendFormat": "BookingService - {{pod}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(container_memory_usage_bytes{namespace=\"default\",pod=~\"eventservice-.*\",container!=\"POD\",container!=\"\"}) by (pod)",
+          "legendFormat": "EventService - {{pod}}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(container_memory_usage_bytes{namespace=\"default\",pod=~\"gateway-.*\",container!=\"POD\",container!=\"\"}) by (pod)",
+          "legendFormat": "Gateway - {{pod}}",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(container_memory_usage_bytes{namespace=\"default\",pod=~\"userservice-.*\",container!=\"POD\",container!=\"\"}) by (pod)",
+          "legendFormat": "UserService - {{pod}}",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(container_memory_usage_bytes{namespace=\"default\",pod=~\"mockpaymentservice-.*\",container!=\"POD\",container!=\"\"}) by (pod)",
+          "legendFormat": "MockPaymentService - {{pod}}",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Memory",
+            "axisPlacement": "auto",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "type": "timeseries",
+      "title": "Pod Count - All Services",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(kube_pod_info{namespace=\"default\",pod=~\"booking-.*\"}) or vector(0)",
+          "legendFormat": "BookingService",
+          "refId": "A"
+        },
+        {
+          "expr": "count(kube_pod_info{namespace=\"default\",pod=~\"eventservice-.*\"}) or vector(0)",
+          "legendFormat": "EventService",
+          "refId": "B"
+        },
+        {
+          "expr": "count(kube_pod_info{namespace=\"default\",pod=~\"gateway-.*\"}) or vector(0)",
+          "legendFormat": "Gateway",
+          "refId": "C"
+        },
+        {
+          "expr": "count(kube_pod_info{namespace=\"default\",pod=~\"userservice-.*\"}) or vector(0)",
+          "legendFormat": "UserService",
+          "refId": "D"
+        },
+        {
+          "expr": "count(kube_pod_info{namespace=\"default\",pod=~\"mockpaymentservice-.*\"}) or vector(0)",
+          "legendFormat": "MockPaymentService",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Pod Count",
+            "axisPlacement": "auto",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "short"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "type": "timeseries",
+      "title": "Gateway - HTTP Requests/sec",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[1m])) by (route)",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "req/s",
+            "axisPlacement": "auto",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "type": "timeseries",
+      "title": "Gateway - HTTP Request Duration",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Duration",
+            "axisPlacement": "auto",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "s"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "type": "timeseries",
+      "title": "Gateway - HTTP Errors/sec",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_errors_total[1m])) by (status_code, error_type)",
+          "legendFormat": "{{status_code}} - {{error_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "errors/s",
+            "axisPlacement": "auto",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "type": "timeseries",
+      "title": "Gateway - Request Duration by Route",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}} p95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Duration",
+            "axisPlacement": "auto",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "s"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ]
+}

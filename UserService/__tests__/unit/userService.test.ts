@@ -1,35 +1,45 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+
+// Define mocks BEFORE jest.mock
+const mockFindFirst = jest.fn<any>();
+const mockFindUnique = jest.fn<any>();
+const mockCreate = jest.fn<any>();
+const mockHash = jest.fn<any>();
+const mockCompare = jest.fn<any>();
+const mockSign = jest.fn<any>();
+const mockVerify = jest.fn<any>();
+const mockLogLoginFailure = jest.fn<any>();
+
+jest.mock('../../src/db/prisma.js', () => ({
+  default: {
+    user: {
+      findFirst: mockFindFirst,
+      findUnique: mockFindUnique,
+      create: mockCreate,
+    },
+  },
+}));
+
+jest.mock('bcrypt', () => ({
+  hash: mockHash,
+  compare: mockCompare,
+}));
+
+jest.mock('jsonwebtoken', () => ({
+  sign: mockSign,
+  verify: mockVerify,
+}));
+
+jest.mock('../../src/service/auditLogService.js', () => ({
+  logLoginFailure: mockLogLoginFailure,
+}));
+
 import { register, login } from '../../src/service/authService.js';
 import { getUserById } from '../../src/service/userService.js';
 import prisma from '../../src/db/prisma.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import * as auditLogService from '../../src/service/auditLogService.js';
-
-// Mock dependencies
-jest.mock('../../src/db/prisma.js', () => ({
-  default: {
-    user: {
-      findFirst: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-    },
-  },
-}));
-
-jest.mock('bcrypt', () => ({
-  hash: jest.fn(),
-  compare: jest.fn(),
-}));
-
-jest.mock('jsonwebtoken', () => ({
-  sign: jest.fn(),
-  verify: jest.fn(),
-}));
-
-jest.mock('../../src/service/auditLogService.js', () => ({
-  logLoginFailure: jest.fn(),
-}));
 
 describe('UserService Unit Tests', () => {
   beforeEach(() => {
@@ -47,7 +57,7 @@ describe('UserService Unit Tests', () => {
       updatedAt: new Date(),
     };
 
-    (prisma.user.findFirst as jest.Mock).mockResolvedValueOnce(existingUser);
+    mockFindFirst.mockResolvedValueOnce(existingUser);
 
     const result = await register({
       userName: 'testuser',
@@ -71,9 +81,9 @@ describe('UserService Unit Tests', () => {
       updatedAt: new Date(),
     };
 
-    (prisma.user.findFirst as jest.Mock).mockResolvedValueOnce(user);
-    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-    (auditLogService.logLoginFailure as jest.Mock).mockResolvedValueOnce(undefined);
+    mockFindFirst.mockResolvedValueOnce(user);
+    mockCompare.mockResolvedValueOnce(false);
+    mockLogLoginFailure.mockResolvedValueOnce(undefined);
 
     const result = await login(
       { userName: 'testuser', password: 'wrongpassword' },
@@ -118,7 +128,7 @@ describe('UserService Unit Tests', () => {
       ],
     };
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce(mockUser);
+    mockFindUnique.mockResolvedValueOnce(mockUser);
 
     const result = await getUserById(1);
 

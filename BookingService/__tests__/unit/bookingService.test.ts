@@ -1,25 +1,33 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import * as bookingService from '../../src/services/bookingService.js';
-import prisma from '../../src/db/prisma.js';
-import { BookingStatus } from '@prisma/client';
-import * as sender from '../../src/messaging/sender.js';
 
-// Mock dependencies
+// Define mocks BEFORE jest.mock
+const mockCreate = jest.fn<any>();
+const mockFindUnique = jest.fn<any>();
+const mockUpdate = jest.fn<any>();
+const mockUpdateMany = jest.fn<any>();
+const mockFindMany = jest.fn<any>();
+const mockSendMessage = jest.fn<any>();
+
 jest.mock('../../src/db/prisma.js', () => ({
   default: {
     booking: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-      findMany: jest.fn(),
+      create: mockCreate,
+      findUnique: mockFindUnique,
+      update: mockUpdate,
+      updateMany: mockUpdateMany,
+      findMany: mockFindMany,
     },
   },
 }));
 
 jest.mock('../../src/messaging/sender.js', () => ({
-  sendMessage: jest.fn(),
+  sendMessage: mockSendMessage,
 }));
+
+import * as bookingService from '../../src/services/bookingService.js';
+import prisma from '../../src/db/prisma.js';
+import { BookingStatus } from '@prisma/client';
+import * as sender from '../../src/messaging/sender.js';
 
 describe('BookingService Unit Tests', () => {
   beforeEach(() => {
@@ -41,8 +49,8 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: null,
       };
 
-      (prisma.booking.create as jest.Mock).mockReturnValueOnce(mockBooking);
-      (sender.sendMessage as jest.Mock).mockReturnValueOnce(undefined);
+      mockCreate.mockReturnValueOnce(mockBooking);
+      mockSendMessage.mockReturnValueOnce(undefined);
 
       const result = await bookingService.createBooking({
         ticketId: 1,
@@ -71,8 +79,8 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: null,
       };
 
-      (prisma.booking.create as jest.Mock).mockReturnValueOnce(mockBooking);
-      (sender.sendMessage as jest.Mock).mockReturnValueOnce(undefined);
+      mockCreate.mockReturnValueOnce(mockBooking);
+      mockSendMessage.mockReturnValueOnce(undefined);
 
       await bookingService.createBooking({
         ticketId: 1,
@@ -105,7 +113,7 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: null,
       };
 
-      (prisma.booking.findUnique as jest.Mock).mockReturnValueOnce(mockBooking as  never);
+      mockFindUnique.mockReturnValueOnce(mockBooking as never);
 
       const result = await bookingService.getBookingByBookingId('booking-123');
 
@@ -116,7 +124,7 @@ describe('BookingService Unit Tests', () => {
     });
 
     it('should return null when booking not found', async () => {
-      (prisma.booking.findUnique as jest.Mock).mockReturnValueOnce(null);
+      mockFindUnique.mockReturnValueOnce(null);
 
       const result = await bookingService.getBookingByBookingId('invalid-id');
 
@@ -144,9 +152,9 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: { cardNumber: '4111111111111111' },
       };
 
-      (prisma.booking.findUnique as jest.Mock).mockReturnValueOnce(mockBooking);
-      (prisma.booking.update as jest.Mock).mockReturnValueOnce(updatedBooking);
-      (sender.sendMessage as jest.Mock).mockReturnValueOnce(undefined);
+      mockFindUnique.mockReturnValueOnce(mockBooking);
+      mockUpdate.mockReturnValueOnce(updatedBooking);
+      mockSendMessage.mockReturnValueOnce(undefined);
 
       const result = await bookingService.submitPayment('booking-123', {
         cardNumber: '4111111111111111',
@@ -170,8 +178,8 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: null,
       };
 
-      (prisma.booking.findUnique as jest.Mock).mockReturnValueOnce(mockBooking);
-      (prisma.booking.update as jest.Mock).mockReturnValueOnce({
+      mockFindUnique.mockReturnValueOnce(mockBooking);
+      mockUpdate.mockReturnValueOnce({
         ...mockBooking,
         status: BookingStatus.EXPIRED,
       });
@@ -195,7 +203,7 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: null,
       };
 
-      (prisma.booking.findUnique as jest.Mock).mockReturnValueOnce(mockBooking);
+      mockFindUnique.mockReturnValueOnce(mockBooking);
 
       await expect(
         bookingService.submitPayment('booking-123', { cardNumber: '4111111111111111' })
@@ -218,7 +226,7 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: null,
       };
 
-      (prisma.booking.update as jest.Mock).mockReturnValueOnce(mockBooking);
+      mockUpdate.mockReturnValueOnce(mockBooking);
 
       const result = await bookingService.updateBookingStatus(
         'booking-123',
@@ -249,7 +257,7 @@ describe('BookingService Unit Tests', () => {
         paymentDetails: null,
       };
 
-      (prisma.booking.update as jest.Mock).mockReturnValueOnce(mockBooking);
+      mockUpdate.mockReturnValueOnce(mockBooking);
 
       await bookingService.updateBookingStatus('booking-123', BookingStatus.EXPIRED);
 
@@ -264,7 +272,7 @@ describe('BookingService Unit Tests', () => {
 
   describe('expireOldBookings', () => {
     it('should expire pending bookings past their expiration time', async () => {
-      (prisma.booking.updateMany as jest.Mock).mockReturnValueOnce({ count: 3 });
+      mockUpdateMany.mockReturnValueOnce({ count: 3 });
 
       const count = await bookingService.expireOldBookings();
 

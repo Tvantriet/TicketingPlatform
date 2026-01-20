@@ -11,10 +11,14 @@ spec:
     metadata:
       labels:
         app: gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: gateway
-#          image: nginx:alpine
+          image: gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -34,6 +38,8 @@ spec:
               value: "http://mockpaymentservice:3002"
             - name: BOOKING_SERVICE_URL
               value: "http://bookingservice:3003"
+            - name: USER_SERVICE_URL
+              value: "http://userservice:3004"
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

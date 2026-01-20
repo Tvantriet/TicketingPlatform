@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import proxyRoutes from './routes/proxyRoutes.js';
 import { PORT, SERVICE_URLS } from './config/services.js';
+import { metricsMiddleware } from './middleware/metrics.js';
+import { register } from './utils/metrics.js';
 
 dotenv.config();
 
@@ -11,6 +13,13 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(metricsMiddleware);
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (_req: Request, res: Response) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
 
 // Gateway health check
 app.get('/health', (_req: Request, res: Response) => {

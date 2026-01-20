@@ -4,9 +4,10 @@ import dotenv from 'dotenv';
 import bookingRoutes from './routes/bookingRoutes.js';
 import { initSender, closeSender } from './messaging/sender.js';
 import { startReceiver, closeReceivers } from './messaging/receiver.js';
-import { ROUTING_KEYS, QUEUES } from './messaging/messagingConfig.js';
+import { ROUTING_KEYS, QUEUES, EXCHANGES } from './messaging/messagingConfig.js';
 import { startCron } from './cron/releaseExpiredReservations.js';
 import { handlePaymentResult } from './controllers/bookingController.js';
+import { anonymizeUserBookings } from './services/bookingService.js';
 import prisma from './db/prisma.js';
 
 dotenv.config();
@@ -33,6 +34,14 @@ async function start() {
     await startReceiver(ROUTING_KEYS.PAYMENT_COMPLETED, handlePaymentCompleted, QUEUES.PAYMENT_COMPLETED);
     await startReceiver(ROUTING_KEYS.PAYMENT_FAILED, handlePaymentFailed, QUEUES.PAYMENT_FAILED);
     
+    // Listen for GDPR user deletion requests
+    await startReceiver(
+      ROUTING_KEYS.USER_DELETION_REQUEST, 
+      handleUserDeletionRequest, 
+      QUEUES.USER_DELETION_REQUESTS,
+      EXCHANGES.USERS
+    );
+    
     // Start cron job for expiring old bookings
     startCron();
     
@@ -53,6 +62,17 @@ async function handlePaymentCompleted(msg: any) {
 async function handlePaymentFailed(msg: any) {
   console.log('Payment failed:', msg);
   await handlePaymentResult(msg.bookingId, 'failed');
+}
+
+async function handleUserDeletionRequest(msg: { userId: string; requestedAt: string }) {
+  console.log('GDPR deletion request received for user:', msg.userId);
+  
+  try {
+    const anonymizedCount = await anonymizeUserBookings(msg.userId);
+    console.log(`GDPR deletion completed for user ${msg.userId}, anonymized ${anonymizedCount} bookings`);
+  } catch (error) {
+    console.error('Error processing GDPR deletion request:', error);
+  }
 }
 
 async function gracefulShutdown(signal: string) {
